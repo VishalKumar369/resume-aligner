@@ -1,28 +1,19 @@
 from typing import List
 import numpy as np
-from openai import AsyncOpenAI
-from app.core.config import settings
+from app.services.ai.factory import AIFactory
 
 class EmbeddingPipeline:
     def __init__(self):
-        self.client = AsyncOpenAI(api_key=settings.OPENAI_API_KEY)
-        self.model = settings.EMBEDDING_MODEL
+        self.provider = AIFactory.get_provider()
 
     async def generate_embedding(self, text: str) -> List[float]:
         """
-        Generates OpenAI embedding for the given text.
+        Generates embedding using the configured provider.
         """
-        response = await self.client.embeddings.create(
-            input=[text.replace("\n", " ")],
-            model=self.model
-        )
-        return response.data[0].embedding
+        return await self.provider.generate_embedding(text)
 
     @staticmethod
     def normalize_vector(vector: List[float]) -> List[float]:
-        """
-        Normalizes vector for cosine similarity (though OpenAI vectors are already normalized).
-        """
         arr = np.array(vector)
         norm = np.linalg.norm(arr)
         if norm == 0:

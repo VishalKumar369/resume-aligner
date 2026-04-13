@@ -1,5 +1,7 @@
+import json
 from typing import List, Dict
 from app.schemas.analytics import ATSScoreSchema
+from app.services.ai.factory import AIFactory
 
 class ATSScorerService:
     @staticmethod
@@ -12,32 +14,43 @@ class ATSScorerService:
         - Bullet point clarity (10%)
         - Formatting best practices (20%)
         """
-        # Placeholder logic for demonstration
-        # In a real app, this would use NLP/LLM extraction
+        provider = AIFactory.get_provider()
         
-        keywords_match = 0.85
-        metrics_found = 0.70
-        sections_complete = 0.90
-        clarity_score = 0.80
-        formatting_score = 0.95
+        prompt = f"""
+        Analyze the following resume against the job description.
+        Provide a weighted ATS score (0-100) and a breakdown across these categories: Keywords, Metrics, Structure, Clarity, Formatting.
+        Also provide specific formatting and content feedback.
         
-        weighted_score = (
-            (keywords_match * 0.40) +
-            (metrics_found * 0.20) +
-            (sections_complete * 0.10) +
-            (clarity_score * 0.10) +
-            (formatting_score * 0.20)
-        ) * 100
-
-        return ATSScoreSchema(
-            score=round(weighted_score, 2),
-            breakdown={
-                "Keywords": keywords_match * 100,
-                "Metrics": metrics_found * 100,
-                "Structure": sections_complete * 100,
-                "Clarity": clarity_score * 100,
-                "Formatting": formatting_score * 100
-            },
-            formatting_feedback=["Strong use of standard fonts", "Consistent date formatting"],
-            content_feedback=["Add more quantifiable metrics to your recent role", "Include specific cloud provider names"]
-        )
+        RETURN ONLY A JSON OBJECT with this structure:
+        {{
+            "score": float,
+            "breakdown": {{"Keywords": float, "Metrics": float, "Structure": float, "Clarity": float, "Formatting": float}},
+            "formatting_feedback": [str],
+            "content_feedback": [str]
+        }}
+        
+        RESUME:
+        {resume_text[:4000]}
+        
+        JOB DESCRIPTION:
+        {jd_text[:4000]}
+        """
+        
+        messages = [{"role": "user", "content": prompt}]
+        response_text = await provider.chat_completion(messages, temperature=0.2)
+        
+        # Parse JSON from response
+        try:
+            # Simple cleaning to find JSON block
+            start = response_text.find("{")
+            end = response_text.rfind("}") + 1
+            data = json.loads(response_text[start:end])
+            return ATSScoreSchema(**data)
+        except Exception as e:
+            # Fallback for parsing errors
+            return ATSScoreSchema(
+                score=0.0,
+                breakdown={"Keywords": 0, "Metrics": 0, "Structure": 0, "Clarity": 0, "Formatting": 0},
+                formatting_feedback=["Error parsing AI response"],
+                content_feedback=[str(e)]
+            )

@@ -31,7 +31,16 @@ class Settings(BaseSettings):
     USE_REDIS: bool = False # Fallback to in-memory if False
     
     # AI Engine
+    AI_PROVIDER: str = "openai" # openai, groq, gemini
+    
     OPENAI_API_KEY: str = "sk-..."
+    GROQ_API_KEY: Optional[str] = None
+    GEMINI_API_KEY: Optional[str] = None
+    
+    LLM_MODEL: str = "gpt-4-turbo-preview"
+    GROQ_MODEL: str = "mixtral-8x7b-32768"
+    GEMINI_MODEL: str = "gemini-1.5-pro"
+    
     EMBEDDING_MODEL: str = "text-embedding-3-small"
     VECTOR_DIMENSION: int = 1536
     
