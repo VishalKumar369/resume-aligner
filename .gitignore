@@ -1,0 +1,25 @@
+# Environment files
+.env
+.env.*
+!.env.example
+
+# Node modules
+node_modules/
+dist/
+build/
+
+# IDE and system files
+.vscode/
+.idea/
+.DS_Store
+*.log
+
+# Sensitive data
+secrets/
+*.pem
+*.key
+auth_token*
+
+# Local data
+data/
+db/
