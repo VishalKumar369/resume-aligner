@@ -34,3 +34,18 @@ async def upload_resume(
 async def list_resumes(db: AsyncSession = Depends(get_db)):
     repo = ResumeRepository(Resume, db)
     return await repo.get_multi()
+
+@router.post("/optimize")
+async def optimize_resume(
+    resume_id: uuid.UUID,
+    jd_id: uuid.UUID,
+    db: AsyncSession = Depends(get_db)
+):
+    # This would call the OptimizationEngine
+    return {
+        "resume_id": resume_id,
+        "jd_id": jd_id,
+        "optimized_filename": "optimized_resume_v2.pdf",
+        "status": "completed",
+        "changes": ["Added Kubernetes to skills", "Rewrote bullet points for impact"]
+    }
