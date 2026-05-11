@@ -3,6 +3,21 @@ import axios from "axios";
 const API_URL = (process.env.NEXT_PUBLIC_API_URL || "http://localhost:8000") + "/api/v1";
 const api = axios.create({ baseURL: API_URL, headers: { "Content-Type": "application/json" } });
 
+// Auth Service
+export const authService = {
+    signup: (data: { email: string; password: string; full_name: string }) => api.post("/auth/signup", data),
+    login: (data: { username: string; password: string }) => {
+        const params = new URLSearchParams();
+        params.append("username", data.username);
+        params.append("password", data.password);
+        return api.post("/auth/login", params, {
+            headers: {
+                "Content-Type": "application/x-www-form-urlencoded"
+            }
+        });
+    }
+};
+
 // Resume Service
 export const resumeService = {
     upload: (file: File, label: string) => {
