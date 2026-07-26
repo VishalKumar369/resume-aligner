@@ -36,7 +36,6 @@ export default function SignupPage() {
                 password,
                 full_name: `${firstName} ${lastName}`.trim()
             });
-            // On successful signup, redirect to login page
             router.push("/auth/login");
         } catch (err: any) {
             setError(err.response?.data?.detail || "Something went wrong during signup");
