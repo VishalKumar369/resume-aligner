@@ -30,11 +30,18 @@ export default function SignupPage() {
         e.preventDefault();
         setError("");
         setIsLoading(true);
+        
+        // Normalize inputs
+        const cleanEmail = email.trim().toLowerCase();
+        const cleanFirstName = firstName.trim().toLowerCase().replace(/\b\w/g, c => c.toUpperCase());
+        const cleanLastName = lastName.trim().toLowerCase().replace(/\b\w/g, c => c.toUpperCase());
+        const cleanFullName = `${cleanFirstName} ${cleanLastName}`.trim();
+
         try {
             await authService.signup({
-                email,
+                email: cleanEmail,
                 password,
-                full_name: `${firstName} ${lastName}`.trim()
+                full_name: cleanFullName
             });
             router.push("/auth/login");
         } catch (err: any) {

@@ -23,15 +23,16 @@ export default function LoginPage() {
         e.preventDefault();
         setError("");
         setIsLoading(true);
+        const cleanEmail = email.trim().toLowerCase();
         try {
             const res = await authService.login({
-                username: email,
+                username: cleanEmail,
                 password: password
             });
             const token = res.data.access_token;
             
             // For now, we only have the token and id in sub (if decoded), so we create a placeholder user
-            setUser({ id: "user", name: "User", email: email }, token);
+            setUser({ id: "user", name: "User", email: cleanEmail }, token);
             
             // Redirect to dashboard on success
             router.push("/dashboard");
