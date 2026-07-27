@@ -1,6 +1,7 @@
 import type { Metadata } from "next";
 import "./globals.css";
 import { Toaster } from "react-hot-toast";
+import { RouteGuard } from "@/components/auth/RouteGuard";
 
 const platformName = process.env.NEXT_PUBLIC_PLATFORM_NAME || "Resume JD Aligner";
 
@@ -36,7 +37,7 @@ export default function RootLayout({
                 />
             </head>
             <body className="bg-background text-white antialiased">
-                {children}
+                <RouteGuard>{children}</RouteGuard>
                 <Toaster
                     position="bottom-right"
                     toastOptions={{

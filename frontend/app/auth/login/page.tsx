@@ -3,12 +3,45 @@
 import { useState } from "react";
 import { motion } from "framer-motion";
 import Link from "next/link";
+import { useRouter } from "next/navigation";
 import { FileText, Eye, EyeOff, ArrowRight } from "lucide-react";
+import { authService } from "@/services/api";
+import { useAuthStore } from "@/store/authStore";
 
 const PLATFORM_NAME = process.env.NEXT_PUBLIC_PLATFORM_NAME || "Resume JD Aligner";
 
 export default function LoginPage() {
+    const router = useRouter();
+    const { setUser } = useAuthStore();
     const [showPassword, setShowPassword] = useState(false);
+    const [email, setEmail] = useState("");
+    const [password, setPassword] = useState("");
+    const [error, setError] = useState("");
+    const [isLoading, setIsLoading] = useState(false);
+
+    const handleSubmit = async (e: React.FormEvent) => {
+        e.preventDefault();
+        setError("");
+        setIsLoading(true);
+        const cleanEmail = email.trim().toLowerCase();
+        try {
+            const res = await authService.login({
+                username: cleanEmail,
+                password: password
+            });
+            const token = res.data.access_token;
+            
+            // For now, we only have the token and id in sub (if decoded), so we create a placeholder user
+            setUser({ id: "user", name: "User", email: cleanEmail }, token);
+            
+            // Redirect to dashboard on success
+            router.push("/dashboard");
+        } catch (err: any) {
+            setError(err.response?.data?.detail || "Invalid email or password");
+        } finally {
+            setIsLoading(false);
+        }
+    };
 
     return (
         <div className="min-h-screen bg-background flex items-center justify-center p-6 relative overflow-hidden">
@@ -34,7 +67,8 @@ export default function LoginPage() {
                 </div>
 
                 <div className="card-elevated rounded-2xl p-8">
-                    <form className="space-y-4" onSubmit={(e) => { e.preventDefault(); window.location.href = "/dashboard"; }}>
+                    {error && <div className="text-red-500 text-sm mb-4 text-center">{error}</div>}
+                    <form className="space-y-4" onSubmit={handleSubmit}>
                         <div>
                             <label className="block text-sm font-medium text-muted-foreground mb-2">Email address</label>
                             <input
@@ -42,6 +76,8 @@ export default function LoginPage() {
                                 placeholder="you@example.com"
                                 className="input-field"
                                 required
+                                value={email}
+                                onChange={(e) => setEmail(e.target.value)}
                             />
                         </div>
                         <div>
@@ -52,6 +88,8 @@ export default function LoginPage() {
                                     placeholder="••••••••"
                                     className="input-field pr-12"
                                     required
+                                    value={password}
+                                    onChange={(e) => setPassword(e.target.value)}
                                 />
                                 <button
                                     type="button"
@@ -71,11 +109,12 @@ export default function LoginPage() {
                         </div>
                         <motion.button
                             type="submit"
+                            disabled={isLoading}
                             whileHover={{ scale: 1.01 }}
                             whileTap={{ scale: 0.99 }}
-                            className="btn-primary w-full flex items-center justify-center gap-2 py-3"
+                            className="btn-primary w-full flex items-center justify-center gap-2 py-3 disabled:opacity-50 disabled:cursor-not-allowed"
                         >
-                            Sign in
+                            {isLoading ? "Signing in..." : "Sign in"}
                             <ArrowRight className="w-4 h-4" />
                         </motion.button>
                     </form>

@@ -3,7 +3,9 @@
 import { useState } from "react";
 import { motion } from "framer-motion";
 import Link from "next/link";
+import { useRouter } from "next/navigation";
 import { FileText, Eye, EyeOff, ArrowRight, Check } from "lucide-react";
+import { authService } from "@/services/api";
 
 const PLATFORM_NAME = process.env.NEXT_PUBLIC_PLATFORM_NAME || "Resume JD Aligner";
 
@@ -15,7 +17,39 @@ const benefits = [
 ];
 
 export default function SignupPage() {
+    const router = useRouter();
     const [showPassword, setShowPassword] = useState(false);
+    const [firstName, setFirstName] = useState("");
+    const [lastName, setLastName] = useState("");
+    const [email, setEmail] = useState("");
+    const [password, setPassword] = useState("");
+    const [error, setError] = useState("");
+    const [isLoading, setIsLoading] = useState(false);
+
+    const handleSubmit = async (e: React.FormEvent) => {
+        e.preventDefault();
+        setError("");
+        setIsLoading(true);
+        
+        // Normalize inputs
+        const cleanEmail = email.trim().toLowerCase();
+        const cleanFirstName = firstName.trim().toLowerCase().replace(/\b\w/g, c => c.toUpperCase());
+        const cleanLastName = lastName.trim().toLowerCase().replace(/\b\w/g, c => c.toUpperCase());
+        const cleanFullName = `${cleanFirstName} ${cleanLastName}`.trim();
+
+        try {
+            await authService.signup({
+                email: cleanEmail,
+                password,
+                full_name: cleanFullName
+            });
+            router.push("/auth/login");
+        } catch (err: any) {
+            setError(err.response?.data?.detail || "Something went wrong during signup");
+        } finally {
+            setIsLoading(false);
+        }
+    };
 
     return (
         <div className="min-h-screen bg-background flex items-center justify-center p-6 relative overflow-hidden">
@@ -51,20 +85,21 @@ export default function SignupPage() {
                 <motion.div initial={{ opacity: 0, x: 20 }} animate={{ opacity: 1, x: 0 }} transition={{ duration: 0.5, delay: 0.1 }}>
                     <div className="card-elevated rounded-2xl p-8">
                         <h2 className="text-xl font-bold mb-6">Create your free account</h2>
-                        <form className="space-y-4" onSubmit={(e) => { e.preventDefault(); window.location.href = "/upload"; }}>
+                        {error && <div className="text-red-500 text-sm mb-4">{error}</div>}
+                        <form className="space-y-4" onSubmit={handleSubmit}>
                             <div className="grid grid-cols-2 gap-3">
                                 <div>
                                     <label className="block text-xs font-medium text-muted-foreground mb-2">First name</label>
-                                    <input type="text" placeholder="John" className="input-field" required />
+                                    <input type="text" placeholder="John" className="input-field" required value={firstName} onChange={(e) => setFirstName(e.target.value)} />
                                 </div>
                                 <div>
                                     <label className="block text-xs font-medium text-muted-foreground mb-2">Last name</label>
-                                    <input type="text" placeholder="Doe" className="input-field" required />
+                                    <input type="text" placeholder="Doe" className="input-field" required value={lastName} onChange={(e) => setLastName(e.target.value)} />
                                 </div>
                             </div>
                             <div>
                                 <label className="block text-xs font-medium text-muted-foreground mb-2">Work email</label>
-                                <input type="email" placeholder="you@example.com" className="input-field" required />
+                                <input type="email" placeholder="you@example.com" className="input-field" required value={email} onChange={(e) => setEmail(e.target.value)} />
                             </div>
                             <div>
                                 <label className="block text-xs font-medium text-muted-foreground mb-2">Password</label>
@@ -75,6 +110,8 @@ export default function SignupPage() {
                                         className="input-field pr-12"
                                         required
                                         minLength={8}
+                                        value={password}
+                                        onChange={(e) => setPassword(e.target.value)}
                                     />
                                     <button
                                         type="button"
@@ -91,11 +128,12 @@ export default function SignupPage() {
                             </label>
                             <motion.button
                                 type="submit"
+                                disabled={isLoading}
                                 whileHover={{ scale: 1.01 }}
                                 whileTap={{ scale: 0.99 }}
-                                className="btn-primary w-full flex items-center justify-center gap-2 py-3"
+                                className="btn-primary w-full flex items-center justify-center gap-2 py-3 disabled:opacity-50 disabled:cursor-not-allowed"
                             >
-                                Create free account
+                                {isLoading ? "Creating..." : "Create free account"}
                                 <ArrowRight className="w-4 h-4" />
                             </motion.button>
                         </form>
