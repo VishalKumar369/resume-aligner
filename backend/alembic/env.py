@@ -9,6 +9,9 @@ from alembic import context
 # access to the values within the .ini file in use.
 config = context.config
 
+from app.core.config import settings
+config.set_main_option("sqlalchemy.url", settings.SQLALCHEMY_DATABASE_URI)
+
 # Interpret the config file for Python logging.
 # This line sets up loggers basically.
 if config.config_file_name is not None:
@@ -57,7 +60,7 @@ async def run_migrations_online() -> None:
 
     """
     connectable = async_engine_from_config(
-        config.get_section(config.config_main_option, {}),
+        config.get_section(config.config_ini_section, {}),
         prefix="sqlalchemy.",
         poolclass=pool.NullPool,
     )
