@@ -1,12 +1,37 @@
 "use client";
 
-import { Bell, Search, User, Plus } from "lucide-react";
+import { useEffect, useRef, useState } from "react";
+import { Bell, Search, User, Plus, LogOut } from "lucide-react";
 import Link from "next/link";
+import { useRouter } from "next/navigation";
 import { motion } from "framer-motion";
+import { useAuthStore } from "@/store/authStore";
 
 const PLATFORM_NAME = process.env.NEXT_PUBLIC_PLATFORM_NAME || "Resume JD Aligner";
 
 export function TopNavbar({ title }: { title?: string }) {
+    const router = useRouter();
+    const clearAuth = useAuthStore((state) => state.clearAuth);
+    const [showProfileMenu, setShowProfileMenu] = useState(false);
+    const menuRef = useRef<HTMLDivElement>(null);
+
+    useEffect(() => {
+        const handleClickOutside = (event: MouseEvent) => {
+            if (menuRef.current && !menuRef.current.contains(event.target as Node)) {
+                setShowProfileMenu(false);
+            }
+        };
+
+        document.addEventListener("mousedown", handleClickOutside);
+        return () => document.removeEventListener("mousedown", handleClickOutside);
+    }, []);
+
+    const handleLogout = () => {
+        setShowProfileMenu(false);
+        clearAuth();
+        router.replace("/auth/login");
+    };
+
     return (
         <header className="h-16 flex items-center justify-between px-6 border-b border-border bg-card/80 backdrop-blur-sm sticky top-0 z-40">
             <div className="flex items-center gap-4">
@@ -39,11 +64,29 @@ export function TopNavbar({ title }: { title?: string }) {
                     <span className="absolute top-1.5 right-1.5 w-2 h-2 rounded-full bg-primary" />
                 </button>
 
-                <button className="flex items-center gap-2 p-1.5 rounded-xl hover:bg-surface-2 transition-colors">
-                    <div className="w-8 h-8 rounded-full bg-primary/20 border border-primary/30 flex items-center justify-center">
-                        <User className="w-4 h-4 text-primary" />
-                    </div>
-                </button>
+                <div ref={menuRef} className="relative">
+                    <button
+                        type="button"
+                        onClick={() => setShowProfileMenu((prev) => !prev)}
+                        className="flex items-center gap-2 p-1.5 rounded-xl hover:bg-surface-2 transition-colors"
+                    >
+                        <div className="w-8 h-8 rounded-full bg-primary/20 border border-primary/30 flex items-center justify-center">
+                            <User className="w-4 h-4 text-primary" />
+                        </div>
+                    </button>
+
+                    {showProfileMenu && (
+                        <div className="absolute right-0 top-full mt-2 w-40 rounded-xl border border-border bg-card shadow-lg py-2 z-50">
+                            <button
+                                onClick={handleLogout}
+                                className="flex w-full items-center gap-2 px-3 py-2 text-sm text-muted hover:bg-surface-2 hover:text-white transition-colors"
+                            >
+                                <LogOut className="w-4 h-4" />
+                                Logout
+                            </button>
+                        </div>
+                    )}
+                </div>
             </div>
         </header>
     );
