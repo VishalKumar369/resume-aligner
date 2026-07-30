@@ -41,7 +41,7 @@ export function TopNavbar({ title }: { title?: string }) {
             </div>
 
             {/* Search */}
-            <div className="hidden md:flex items-center gap-2 bg-surface border border-border rounded-xl px-3 py-2 w-64 text-sm text-muted">
+            <div className="hidden md:flex items-center gap-2 bg-surface border border-border rounded-xl px-3 py-2 w-3/12 text-sm text-muted">
                 <Search className="w-4 h-4 flex-shrink-0" />
                 <span>Search resumes, companies…</span>
                 <kbd className="ml-auto text-xs bg-surface-2 text-muted px-1.5 py-0.5 rounded border border-border">⌘K</kbd>
