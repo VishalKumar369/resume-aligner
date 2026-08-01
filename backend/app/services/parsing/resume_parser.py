@@ -1,5 +1,5 @@
 import re
-from typing import Any, Dict, List
+from typing import Any, Dict, List, Optional
 
 
 class ResumeParserService:
@@ -30,11 +30,42 @@ class ResumeParserService:
         }
 
     async def parse_bytes(self, file_bytes: bytes) -> Dict[str, Any]:
-        try:
-            text = file_bytes.decode("utf-8")
-        except UnicodeDecodeError:
-            text = file_bytes.decode("latin-1", errors="ignore")
+        text = self._decode_text(file_bytes)
         return await self.parse(text)
+
+    def _decode_text(self, file_bytes: bytes, filename: Optional[str] = None, content_type: Optional[str] = None) -> str:
+        if self._looks_like_binary(file_bytes, filename=filename, content_type=content_type):
+            fallback_name = filename or "uploaded file"
+            return f"[Binary or non-text content stored as file reference only for {fallback_name}]"
+
+        for encoding in ("utf-8", "utf-8-sig", "utf-16", "utf-16-le", "utf-16-be", "cp1252"):
+            try:
+                decoded = file_bytes.decode(encoding)
+                return self._sanitize_text(decoded)
+            except UnicodeDecodeError:
+                continue
+        return self._sanitize_text(file_bytes.decode("latin-1", errors="ignore"))
+
+    def _looks_like_binary(self, file_bytes: bytes, filename: Optional[str] = None, content_type: Optional[str] = None) -> bool:
+        if content_type and "text" in content_type.lower():
+            return False
+
+        name = (filename or "").lower()
+        if name.endswith((".txt", ".md", ".csv", ".json", ".xml", ".html", ".css", ".js", ".ts", ".py", ".yaml", ".yml")):
+            return False
+
+        if file_bytes.startswith(b"%PDF"):
+            return True
+        if file_bytes.startswith((b"\x89PNG", b"\xff\xd8\xff", b"PK\x03\x04", b"GIF87a", b"GIF89a", b"RIFF")):
+            return True
+        if b"\x00" in file_bytes:
+            return True
+        return False
+
+    def _sanitize_text(self, text: str) -> str:
+        text = text.replace("\x00", "")
+        text = re.sub(r"[\x00-\x08\x0b\x0c\x0e-\x1f]", "", text)
+        return text
 
     def _normalize(self, text: str) -> str:
         return re.sub(r"\s+", " ", text or "").strip().lower()

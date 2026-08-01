@@ -38,10 +38,12 @@ export const authService = {
 
 // Resume Service
 export const resumeService = {
-    upload: (file: File, label: string) => {
+    upload: (file: File, label?: string) => {
         const form = new FormData();
         form.append("file", file);
-        form.append("label", label);
+        if (label && label.trim()) {
+            form.append("label", label.trim());
+        }
         return api.post("/resume/upload", form, { headers: { "Content-Type": "multipart/form-data" } });
     },
     getAll: () => api.get("/resume/list"),
