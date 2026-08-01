@@ -50,7 +50,7 @@ export const resumeService = {
 
 // JD Service
 export const jdService = {
-    upload: (data: { raw_text: string; url?: string; company_name?: string }) => api.post("/jd/upload", data),
+    upload: (data: { raw_text: string; title: string; url?: string; company_name?: string }) => api.post("/jd/upload", data),
 };
 
 // Alignment Service

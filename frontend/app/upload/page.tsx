@@ -5,6 +5,7 @@ import { motion, AnimatePresence } from "framer-motion";
 import { useDropzone } from "react-dropzone";
 import { Upload, FileText, CheckCircle, Loader2, ArrowRight, Link as LinkIcon, Sparkles } from "lucide-react";
 import { cn } from "@/lib/utils";
+import { resumeService, jdService, alignmentService } from "@/services/api";
 
 const steps = [
     { id: 1, title: "Upload Resume" },
@@ -19,6 +20,10 @@ export default function UploadPage() {
     const [uploadedFile, setUploadedFile] = useState<File | null>(null);
     const [jdText, setJdText] = useState("");
     const [processing, setProcessing] = useState(false);
+    const [resumeId, setResumeId] = useState<string | null>(null);
+    const [jdId, setJdId] = useState<string | null>(null);
+    const [alignment, setAlignment] = useState<any>(null);
+    const [error, setError] = useState<string | null>(null);
 
     const onDrop = useCallback((acceptedFiles: File[]) => {
         if (acceptedFiles[0]) setUploadedFile(acceptedFiles[0]);
@@ -31,13 +36,60 @@ export default function UploadPage() {
     });
 
     const advance = async () => {
-        if (currentStep === 3 || currentStep === 4) {
+        if (currentStep === 1) {
+            if (!uploadedFile) return;
             setProcessing(true);
-            await new Promise((r) => setTimeout(r, 2000));
-            setProcessing(false);
+            setError(null);
+            try {
+                const response = await resumeService.upload(uploadedFile, uploadedFile.name);
+                setResumeId(response.data.id);
+                setCurrentStep(2);
+            } catch (err: any) {
+                setError(err?.response?.data?.detail || "Resume upload failed");
+            } finally {
+                setProcessing(false);
+            }
+            return;
         }
+
+        if (currentStep === 2) {
+            if (!jdText.trim()) return;
+            setProcessing(true);
+            setError(null);
+            try {
+                const response = await jdService.upload({ raw_text: jdText, title: "Target Role", company_name: "Company" });
+                setJdId(response.data.id);
+                setCurrentStep(3);
+            } catch (err: any) {
+                setError(err?.response?.data?.detail || "JD upload failed");
+            } finally {
+                setProcessing(false);
+            }
+            return;
+        }
+
+        if (currentStep === 3) {
+            if (!resumeId || !jdId) return;
+            setProcessing(true);
+            setError(null);
+            try {
+                const response = await alignmentService.generate(resumeId, jdId);
+                setAlignment(response.data);
+                setCurrentStep(4);
+            } catch (err: any) {
+                setError(err?.response?.data?.detail || "Alignment failed");
+            } finally {
+                setProcessing(false);
+            }
+            return;
+        }
+
+        if (currentStep === 4) {
+            setCurrentStep(5);
+            return;
+        }
+
         if (currentStep === 5) { window.location.href = "/dashboard"; return; }
-        setCurrentStep((s) => s + 1);
     };
 
     return (
@@ -149,16 +201,16 @@ export default function UploadPage() {
                                         </div>
                                         <p className="text-muted-foreground">Analyzing your resume against the JD…</p>
                                     </div>
-                                ) : (
+                                ) : alignment ? (
                                     <div className="space-y-4">
-                                        {[{ label: "ATS Score", value: 74, note: "Needs improvement" }, { label: "JD Alignment", value: 68, note: "Moderate match" }].map((s) => (
+                                        {[{ label: "ATS Score", value: alignment.ats_score, note: alignment.feedback }, { label: "JD Alignment", value: alignment.alignment_score, note: "Skill and experience match" }].map((s) => (
                                             <div key={s.label} className="bg-surface-2 rounded-xl p-4 border border-border/50">
                                                 <div className="flex items-center justify-between mb-2">
                                                     <span className="text-sm font-medium">{s.label}</span>
-                                                    <span className="text-sm font-bold text-warning">{s.value}%</span>
+                                                    <span className="text-sm font-bold text-warning">{Math.round(s.value)}%</span>
                                                 </div>
                                                 <div className="h-2 bg-border rounded-full overflow-hidden">
-                                                    <motion.div initial={{ width: 0 }} animate={{ width: `${s.value}%` }} transition={{ duration: 0.8 }} className="h-full bg-warning rounded-full" />
+                                                    <motion.div initial={{ width: 0 }} animate={{ width: `${Math.round(s.value)}%` }} transition={{ duration: 0.8 }} className="h-full bg-warning rounded-full" />
                                                 </div>
                                                 <p className="text-xs text-muted mt-2">{s.note}</p>
                                             </div>
@@ -166,12 +218,14 @@ export default function UploadPage() {
                                         <div className="bg-error/5 border border-error/20 rounded-xl p-4">
                                             <p className="text-sm font-medium text-error mb-2">Top Missing Keywords</p>
                                             <div className="flex flex-wrap gap-2">
-                                                {["Kubernetes", "Terraform", "Service Mesh", "Go language"].map((kw) => (
+                                                {(alignment.missing_keywords || []).slice(0, 4).map((kw: string) => (
                                                     <span key={kw} className="px-2.5 py-1 bg-error/10 text-error border border-error/20 rounded-lg text-xs">{kw}</span>
                                                 ))}
                                             </div>
                                         </div>
                                     </div>
+                                ) : (
+                                    <p className="text-sm text-muted">The analysis will appear here after the backend finishes processing.</p>
                                 )}
                             </div>
                         )}
@@ -211,7 +265,7 @@ export default function UploadPage() {
                                 <h2 className="text-2xl font-bold mb-2">Analysis complete!</h2>
                                 <p className="text-muted-foreground text-sm mb-6">Your dashboard is ready with full analytics, skill gaps, and your optimized resume version.</p>
                                 <div className="grid grid-cols-3 gap-4 mb-6">
-                                    {[{ label: "ATS Score", value: "92%", color: "text-success" }, { label: "JD Alignment", value: "85%", color: "text-primary" }, { label: "Missing Skills", value: "4", color: "text-warning" }].map((s) => (
+                                    {[{ label: "ATS Score", value: `${Math.round(alignment?.ats_score || 0)}%`, color: "text-success" }, { label: "JD Alignment", value: `${Math.round(alignment?.alignment_score || 0)}%`, color: "text-primary" }, { label: "Missing Skills", value: `${(alignment?.missing_keywords || []).length}`, color: "text-warning" }].map((s) => (
                                         <div key={s.label} className="bg-surface-2 rounded-xl p-4 border border-border/50">
                                             <div className={`text-2xl font-bold ${s.color}`}>{s.value}</div>
                                             <div className="text-xs text-muted mt-1">{s.label}</div>
@@ -227,22 +281,23 @@ export default function UploadPage() {
                 <div className="flex items-center justify-between mt-6">
                     <button
                         onClick={() => setCurrentStep((s) => Math.max(1, s - 1))}
-                        disabled={currentStep === 1}
+                        disabled={currentStep === 1 || processing}
                         className="btn-ghost disabled:opacity-30 disabled:cursor-not-allowed"
                     >
                         Back
                     </button>
                     <motion.button
                         onClick={advance}
-                        disabled={processing || (currentStep === 1 && !uploadedFile)}
+                        disabled={processing || (currentStep === 1 && !uploadedFile) || (currentStep === 2 && !jdText.trim())}
                         whileHover={{ scale: 1.02 }}
                         whileTap={{ scale: 0.98 }}
                         className="btn-primary flex items-center gap-2 disabled:opacity-40 disabled:cursor-not-allowed"
                     >
                         {processing ? <><Loader2 className="w-4 h-4 animate-spin" /> Processing…</> :
-                            currentStep === 5 ? "Go to Dashboard" : <>Continue <ArrowRight className="w-4 h-4" /></>}
+                            currentStep === 5 ? "Go to Dashboard" : currentStep === 1 ? "Upload Resume" : currentStep === 2 ? "Upload Job Description" : currentStep === 3 ? "Generate Alignment" : "Continue"}
                     </motion.button>
                 </div>
+                {error && <p className="text-sm text-error mt-4">{error}</p>}
             </div>
         </div>
     );
