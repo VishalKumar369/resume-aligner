@@ -1,10 +1,11 @@
-from fastapi import APIRouter, Depends, File, UploadFile, HTTPException
+from fastapi import APIRouter, Depends, File, UploadFile
 from sqlalchemy.ext.asyncio import AsyncSession
 from app.db.session import get_db
-from app.schemas.resume import ResumeOut, ResumeUploadSchema
+from app.schemas.resume import ResumeOut
 from app.models.resume import Resume
 from app.repositories.resume_repo import ResumeRepository
 from app.services.storage.storage_adapter import get_storage
+from app.services.parsing.resume_parser import ResumeParserService
 from typing import List
 import uuid
 
@@ -17,18 +18,26 @@ async def upload_resume(
     db: AsyncSession = Depends(get_db)
 ):
     storage = get_storage()
-    # In a real app, user_id would come from JWT dependency
-    dummy_user_id = uuid.uuid4() 
-    
+    dummy_user_id = uuid.uuid4()
+
     file_path = await storage.upload_file(file.file, file.filename)
-    
+    file_bytes = await storage.get_file_content(file_path)
+    raw_text = file_bytes.decode("utf-8", errors="ignore")
+
+    parser = ResumeParserService()
+    structured_data = await parser.parse_bytes(file_bytes)
+
     repo = ResumeRepository(Resume, db)
-    return await repo.create(obj_in={
+    resume = await repo.create(obj_in={
         "owner_id": dummy_user_id,
         "filename": file.filename,
         "s3_path": file_path,
-        "label": label
+        "label": label,
+        "raw_text": raw_text,
+        "structured_data": structured_data,
     })
+    await db.commit()
+    return resume
 
 @router.get("/list", response_model=List[ResumeOut])
 async def list_resumes(db: AsyncSession = Depends(get_db)):
