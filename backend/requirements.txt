@@ -25,3 +25,4 @@ pgvector==0.2.5
 boto3==1.34.69
 cloudinary==1.39.1
 firebase-admin==6.5.0
+email-validator==2.2.0

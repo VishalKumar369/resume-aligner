@@ -1,10 +1,12 @@
-from fastapi import APIRouter, Depends, File, UploadFile, HTTPException
+from fastapi import APIRouter, Depends, File, UploadFile
 from sqlalchemy.ext.asyncio import AsyncSession
 from app.db.session import get_db
-from app.schemas.resume import ResumeOut, ResumeUploadSchema
+from app.schemas.resume import ResumeOut
 from app.models.resume import Resume
 from app.repositories.resume_repo import ResumeRepository
 from app.services.storage.storage_adapter import get_storage
+from app.services.parsing.resume_parser import ResumeParserService
+from app.services.auth.default_user import get_or_create_default_user
 from typing import List
 import uuid
 
@@ -17,18 +19,29 @@ async def upload_resume(
     db: AsyncSession = Depends(get_db)
 ):
     storage = get_storage()
-    # In a real app, user_id would come from JWT dependency
-    dummy_user_id = uuid.uuid4() 
-    
+    owner_id = await get_or_create_default_user(db)
+
     file_path = await storage.upload_file(file.file, file.filename)
-    
+    file_bytes = await storage.get_file_content(file_path)
+
+    parser = ResumeParserService()
+    raw_text = parser._decode_text(file_bytes, filename=file.filename, content_type=file.content_type)
+
+    if not raw_text.strip():
+        raw_text = f"[Binary or non-text content stored as file reference only for {file.filename}]"
+
+    structured_data = await parser.parse_bytes(file_bytes)
+
     repo = ResumeRepository(Resume, db)
-    return await repo.create(obj_in={
-        "owner_id": dummy_user_id,
+    resume = await repo.create(obj_in={
+        "owner_id": owner_id,
         "filename": file.filename,
         "s3_path": file_path,
-        "label": label
+        "raw_text": raw_text,
+        "structured_data": structured_data,
     })
+    await db.commit()
+    return resume
 
 @router.get("/list", response_model=List[ResumeOut])
 async def list_resumes(db: AsyncSession = Depends(get_db)):

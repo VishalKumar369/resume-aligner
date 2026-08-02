@@ -14,4 +14,6 @@ async def generate_alignment(
     db: AsyncSession = Depends(get_db)
 ):
     service = AlignmentScorerService()
-    return await service.calculate_alignment(resume_id, jd_id)
+    result = await service.calculate_alignment(resume_id=resume_id, jd_id=jd_id, db=db)
+    await db.commit()
+    return result
