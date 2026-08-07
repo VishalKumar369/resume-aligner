@@ -119,7 +119,7 @@ REDIS_URL=redis://localhost:6379/0
 ---
 
 ## Contribution Guidelines
-1. Fork the repository.
+1. Fork the repository .
 2. Create a feature branch (`git checkout -b feature/amazing-feature`).
 3. Commit your changes.
 4. Push to the branch.
