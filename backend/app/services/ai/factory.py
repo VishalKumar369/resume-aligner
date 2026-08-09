@@ -71,10 +71,31 @@ class GeminiProvider(AIProvider):
         )
         return result["embedding"]
 
+class AIUnavailableError(RuntimeError):
+    """Raised when an LLM is requested but no usable API key is configured."""
+
+
 class AIFactory:
+    @staticmethod
+    def is_available() -> bool:
+        """Whether an LLM call can be made right now.
+
+        Callers use this to choose the LLM path or fall back to deterministic
+        parsing, instead of discovering the missing key as an auth failure.
+        """
+        return settings.has_ai_credentials
+
     @staticmethod
     def get_provider() -> AIProvider:
         provider = settings.AI_PROVIDER.lower()
+
+        if not settings.has_ai_credentials:
+            raise AIUnavailableError(
+                f"No API key configured for AI_PROVIDER='{provider}'. "
+                f"Set {provider.upper()}_API_KEY in backend/.env, or leave it blank "
+                "to use the heuristic parser."
+            )
+
         if provider == "openai":
             return OpenAIProvider()
         elif provider == "groq":

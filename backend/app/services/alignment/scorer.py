@@ -1,5 +1,4 @@
-import json
-from typing import Any, Dict, Optional
+from typing import Any, Dict, List, Optional
 from uuid import UUID
 
 from fastapi import HTTPException
@@ -7,11 +6,16 @@ from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.models.jd import JobDescription
 from app.models.resume import Resume
-from app.schemas.analytics import AlignmentResponseSchema
-from app.services.ai.factory import AIFactory
+from app.schemas.analytics import AlignmentResponseSchema, ExtractionHealthSchema
 from app.services.alignment.persistence import AlignmentPersistenceService
 from app.services.parsing.jd_parser import JDParserService
 from app.services.parsing.resume_parser import ResumeParserService
+
+_PLACEHOLDER_ID = UUID(int=0)
+
+# Below this extraction confidence the parsed resume is not trustworthy enough
+# to present its score as a real match.
+MIN_TRUSTED_CONFIDENCE = 0.3
 
 
 class AlignmentScorerService:
@@ -53,6 +57,7 @@ class AlignmentScorerService:
         result = await self.score_resume_to_jd(resume_data, jd_data)
         result.resume_id = resume_id
         result.jd_id = jd_id
+        result.extraction_health = self._extraction_health(resume, jd_text)
 
         if db is not None:
             persistence = AlignmentPersistenceService(db)
@@ -60,52 +65,24 @@ class AlignmentScorerService:
 
         return result
 
-    async def score_resume_to_jd(self, resume_data: Dict[str, Any], jd_data: Dict[str, Any]) -> AlignmentResponseSchema:
+    async def score_resume_to_jd(
+        self, resume_data: Dict[str, Any], jd_data: Dict[str, Any]
+    ) -> AlignmentResponseSchema:
         resume_skills = {skill.lower() for skill in resume_data.get("skills", {}).get("hard_skills", [])}
         jd_skills = {skill.lower() for skill in jd_data.get("requirements", {}).get("mandatory", [])}
 
         if not resume_skills and not jd_skills:
-            alignment_score = 0.0
-            skill_match_score = 0.0
-            experience_match_score = 0.0
-        else:
-            matched_skills = sorted(resume_skills.intersection(jd_skills))
-            missing_keywords = sorted(jd_skills.difference(resume_skills))
-
-            skill_match_score = round((len(matched_skills) / len(jd_skills) * 100.0) if jd_skills else 100.0, 2)
-            experience_years = max(int(resume_data.get("experience_years", 0) or 0), 0)
-            required_experience = max(int(jd_data.get("experience_years", 0) or 0), 1)
-            experience_match_score = round(min(100.0, (experience_years / required_experience) * 100.0), 2)
-            alignment_score = round((skill_match_score * 0.7) + (experience_match_score * 0.3), 2)
-            ats_score = round(min(100.0, alignment_score + 3.0), 2)
-
-            feedback = "Resume aligns well with the role requirements." if alignment_score >= 80 else "Resume needs more targeted skill coverage."
-            suggestions = [f"Add experience with {keyword}" for keyword in missing_keywords[:3]]
-
             return AlignmentResponseSchema(
-                resume_id=UUID(int=0),
-                jd_id=UUID(int=0),
-                alignment_score=alignment_score,
-                ats_score=ats_score,
-                skill_match_score=skill_match_score,
-                experience_match_score=experience_match_score,
-                missing_keywords=missing_keywords,
-                feedback=feedback,
-                improvement_suggestions=suggestions,
+                resume_id=_PLACEHOLDER_ID,
+                jd_id=_PLACEHOLDER_ID,
+                alignment_score=0.0,
+                ats_score=0.0,
+                skill_match_score=0.0,
+                experience_match_score=0.0,
+                missing_keywords=[],
+                feedback="No skills could be identified in either the resume or the job description.",
+                improvement_suggestions=[],
             )
-
-        return AlignmentResponseSchema(
-            resume_id=UUID(int=0),
-            jd_id=UUID(int=0),
-            alignment_score=alignment_score,
-            ats_score=0.0,
-            skill_match_score=skill_match_score,
-            experience_match_score=experience_match_score,
-            missing_keywords=[],
-            feedback="Resume needs more targeted skill coverage.",
-            improvement_suggestions=[],
-        )
-
 
         matched_skills = sorted(resume_skills.intersection(jd_skills))
         missing_keywords = sorted(jd_skills.difference(resume_skills))
@@ -117,12 +94,16 @@ class AlignmentScorerService:
         alignment_score = round((skill_match_score * 0.7) + (experience_match_score * 0.3), 2)
         ats_score = round(min(100.0, alignment_score + 3.0), 2)
 
-        feedback = "Resume aligns well with the role requirements." if alignment_score >= 80 else "Resume needs more targeted skill coverage."
+        feedback = (
+            "Resume aligns well with the role requirements."
+            if alignment_score >= 80
+            else "Resume needs more targeted skill coverage."
+        )
         suggestions = [f"Add experience with {keyword}" for keyword in missing_keywords[:3]]
 
         return AlignmentResponseSchema(
-            resume_id=UUID(int=0),
-            jd_id=UUID(int=0),
+            resume_id=_PLACEHOLDER_ID,
+            jd_id=_PLACEHOLDER_ID,
             alignment_score=alignment_score,
             ats_score=ats_score,
             skill_match_score=skill_match_score,
@@ -132,3 +113,30 @@ class AlignmentScorerService:
             improvement_suggestions=suggestions,
         )
 
+    def _extraction_health(
+        self, resume: Optional[Resume], jd_text: str
+    ) -> ExtractionHealthSchema:
+        """Report parse quality so a broken extraction is not read as a poor match."""
+        warnings: List[str] = []
+        resume_ok = True
+
+        if resume is not None:
+            meta = resume.extraction_meta or {}
+            warnings.extend(meta.get("warnings", []))
+            confidence = meta.get("confidence")
+            if not (resume.raw_text or "").strip():
+                resume_ok = False
+                warnings.append("resume_text_empty")
+            elif confidence is not None and confidence < MIN_TRUSTED_CONFIDENCE:
+                resume_ok = False
+                warnings.append("low_extraction_confidence")
+
+        jd_ok = bool((jd_text or "").strip())
+        if not jd_ok:
+            warnings.append("jd_text_empty")
+
+        return ExtractionHealthSchema(
+            resume_ok=resume_ok,
+            jd_ok=jd_ok,
+            warnings=list(dict.fromkeys(warnings)),
+        )

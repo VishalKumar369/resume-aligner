@@ -31,16 +31,37 @@ class Settings(BaseSettings):
     USE_REDIS: bool = False # Fallback to in-memory if False
     
     # AI Engine
-    AI_PROVIDER: str = "openai" # openai, groq, gemini
-    
-    OPENAI_API_KEY: str = "sk-..."
+    # Defaults to a free-tier provider; parsing falls back to the deterministic
+    # heuristic extractor whenever no key is configured.
+    AI_PROVIDER: str = "gemini" # openai, groq, gemini
+
+    OPENAI_API_KEY: Optional[str] = None
     GROQ_API_KEY: Optional[str] = None
     GEMINI_API_KEY: Optional[str] = None
-    
-    LLM_MODEL: str = "gpt-4-turbo-preview"
-    GROQ_MODEL: str = "mixtral-8x7b-32768"
-    GEMINI_MODEL: str = "gemini-1.5-pro"
-    
+
+    LLM_MODEL: str = "gpt-4o-mini"
+    GROQ_MODEL: str = "llama-3.3-70b-versatile"
+    GEMINI_MODEL: str = "gemini-2.0-flash"
+
+    @property
+    def ai_api_key(self) -> Optional[str]:
+        return {
+            "openai": self.OPENAI_API_KEY,
+            "groq": self.GROQ_API_KEY,
+            "gemini": self.GEMINI_API_KEY,
+        }.get(self.AI_PROVIDER.lower())
+
+    @property
+    def has_ai_credentials(self) -> bool:
+        """Whether the selected provider has a usable key.
+
+        Placeholder values such as "sk-..." are treated as missing so the app
+        degrades to heuristic parsing instead of failing on an auth error.
+        """
+        key = (self.ai_api_key or "").strip()
+        return len(key) > 12 and not key.endswith("...")
+
+
     EMBEDDING_MODEL: str = "text-embedding-3-small"
     VECTOR_DIMENSION: int = 1536
     

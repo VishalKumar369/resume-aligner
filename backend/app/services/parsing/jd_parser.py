@@ -1,14 +1,10 @@
 import re
 from typing import Any, Dict, List
 
+from app.services.parsing.skill_vocabulary import find_skills
+
 
 class JDParserService:
-    TECH_SKILLS = [
-        "python", "fastapi", "postgresql", "docker", "kubernetes", "aws", "react",
-        "typescript", "javascript", "nodejs", "node", "sql", "redis", "graphql",
-        "ci/cd", "git", "linux", "elasticsearch", "spark", "machine learning",
-        "data engineering", "backend", "api", "microservices"
-    ]
 
     async def parse(self, text: str) -> Dict[str, Any]:
         normalized = self._normalize(text)
@@ -67,8 +63,4 @@ class JDParserService:
         return 0
 
     def _extract_skills(self, text: str) -> List[str]:
-        found = []
-        for skill in self.TECH_SKILLS:
-            if re.search(rf"\b{re.escape(skill)}\b", text):
-                found.append(skill.capitalize() if skill not in {"ci/cd", "nodejs", "api"} else skill)
-        return found
+        return find_skills(text)

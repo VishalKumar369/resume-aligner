@@ -2,6 +2,16 @@ from typing import Optional, List, Dict, Any
 from uuid import UUID
 from pydantic import BaseModel, ConfigDict
 
+class AlignmentRequestSchema(BaseModel):
+    resume_id: UUID
+    jd_id: UUID
+
+class ExtractionHealthSchema(BaseModel):
+    """Tells the caller whether a low score reflects a weak match or a failed parse."""
+    resume_ok: bool = True
+    jd_ok: bool = True
+    warnings: List[str] = []
+
 class AlignmentResponseSchema(BaseModel):
     resume_id: UUID
     jd_id: UUID
@@ -12,6 +22,7 @@ class AlignmentResponseSchema(BaseModel):
     missing_keywords: List[str]
     feedback: str
     improvement_suggestions: List[str]
+    extraction_health: Optional[ExtractionHealthSchema] = None
 
     model_config = ConfigDict(from_attributes=True)
 

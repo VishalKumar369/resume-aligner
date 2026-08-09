@@ -8,9 +8,12 @@ class Resume(Base):
 
     owner_id = Column(UUID(as_uuid=True), ForeignKey("users.id"), nullable=False)
     filename = Column(String, nullable=False)
+    label = Column(String) # User-supplied name, e.g. "Main Tech Resume"
     s3_path = Column(String)
+    content_hash = Column(String, index=True) # SHA-256 of the uploaded bytes
     raw_text = Column(String)
     structured_data = Column(JSON) # Extracted skills, exp, etc.
+    extraction_meta = Column(JSON) # How the text was extracted, and how well
     
     # Relationships
     owner = relationship("User", back_populates="resumes")
