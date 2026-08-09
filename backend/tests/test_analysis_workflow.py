@@ -35,6 +35,8 @@ def _get_nested(obj, *keys):
     for key in keys:
         if isinstance(value, dict):
             value = value.get(key)
+        elif isinstance(value, (list, tuple)) and isinstance(key, int):
+            value = value[key] if -len(value) <= key < len(value) else None
         else:
             value = getattr(value, key, None)
         if value is None:
@@ -78,7 +80,8 @@ async def test_alignment_scorer_returns_structured_match_results():
     jd = await jd_service.parse(SAMPLE_JD_TEXT)
     result = await scorer.score_resume_to_jd(resume, jd)
 
-    assert 0.0 <= _get_nested(result, "alignment_score") <= 1.0
-    assert 0.0 <= _get_nested(result, "skill_match_score") <= 1.0
+    # Scores are reported on a 0-100 percentage scale.
+    assert 0.0 <= _get_nested(result, "alignment_score") <= 100.0
+    assert 0.0 <= _get_nested(result, "skill_match_score") <= 100.0
     assert _get_nested(result, "feedback")
     assert isinstance(_get_nested(result, "missing_keywords"), list)
