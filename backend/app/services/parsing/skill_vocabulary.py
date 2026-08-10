@@ -1,5 +1,5 @@
 import re
-from typing import Dict, List, Tuple
+from typing import Dict, List, Optional, Tuple
 
 # Canonical display name -> surface forms found in resumes and job descriptions.
 # The canonical name is what gets stored and shown, so matching is case- and
@@ -127,6 +127,65 @@ def find_soft_skills(text: str) -> List[str]:
         if canonical not in found and pattern.search(text):
             found.append(canonical)
     return sorted(found)
+
+
+# Category of each canonical skill. Used to award partial credit when a resume
+# covers the same area with a different tool - a JD asking for Kubernetes is
+# partly satisfied by Docker experience.
+SKILL_CATEGORIES: Dict[str, str] = {
+    "Python": "language", "TypeScript": "language", "JavaScript": "language",
+    "Java": "language", "Go": "language", "C++": "language", "Scala": "language",
+    "SQL": "language",
+
+    "FastAPI": "web-framework", "Django": "web-framework", "Flask": "web-framework",
+    "Node.js": "web-framework", "Express.js": "web-framework",
+
+    "React": "frontend", "Next.js": "frontend", "Redux": "frontend",
+    "Tailwind CSS": "frontend", "Frontend": "discipline", "Backend": "discipline",
+
+    "PostgreSQL": "database", "MySQL": "database", "MongoDB": "database",
+    "Redis": "database", "Elasticsearch": "database", "Snowflake": "database",
+
+    "Docker": "containers", "Kubernetes": "containers",
+
+    "AWS": "cloud", "Azure": "cloud", "GCP": "cloud", "Firebase": "cloud",
+    "Terraform": "infrastructure",
+
+    "CI/CD": "devops", "Jenkins": "devops", "Git": "tooling", "Linux": "tooling",
+
+    "Kafka": "messaging", "RabbitMQ": "messaging", "Celery": "messaging",
+
+    "Spark": "data", "Airflow": "data", "Databricks": "data",
+    "Pandas": "data", "NumPy": "data", "Data Engineering": "data",
+
+    "Machine Learning": "ai-ml", "Deep Learning": "ai-ml", "NLP": "ai-ml",
+    "LLM": "ai-ml", "RAG": "ai-ml", "PyTorch": "ai-ml", "TensorFlow": "ai-ml",
+
+    "REST API": "api", "GraphQL": "api",
+    "Microservices": "architecture",
+}
+
+# Categories where one tool is a genuine partial substitute for another.
+# "language" is excluded on purpose: knowing Java says little about a Python
+# role, so crediting it would inflate the score.
+PARTIAL_CREDIT_CATEGORIES = frozenset({
+    "web-framework", "frontend", "database", "containers", "cloud",
+    "infrastructure", "devops", "messaging", "data", "ai-ml", "api",
+})
+
+
+def category_of(skill: str) -> Optional[str]:
+    """Category of a skill, accepting either a canonical name or an alias."""
+    if not skill:
+        return None
+    direct = SKILL_CATEGORIES.get(skill)
+    if direct:
+        return direct
+    return SKILL_CATEGORIES.get(normalize_skill(skill))
+
+
+def supports_partial_credit(category: Optional[str]) -> bool:
+    return bool(category) and category in PARTIAL_CREDIT_CATEGORIES
 
 
 def normalize_skill(name: str) -> str:

@@ -1,6 +1,6 @@
 # Backend Analysis & Redesign Plan
 
-> Status: **Phases 0–3 complete.** Phases 4–9 pending.
+> Status: **Phases 0–4 complete.** Phases 5–9 pending.
 > Date: 2026-08-09
 > Scope: the 5-step analysis flow (Upload Resume → Add JD → Review Alignment → Optimize Resume → View Analytics)
 >
@@ -524,12 +524,55 @@ Two latent bugs were found and fixed along the way:
 
 Test suite: **90 passed** (was 62).
 
+### Phase 4 — alignment & ATS scoring redesign ✅
+Scoring now uses the data Phases 2–3 extract — see [backend/docs/scoring-engine.md](backend/docs/scoring-engine.md).
+
+| Component | File |
+|---|---|
+| Weighted skill matching, partial credit, P1/P2/P3 gaps | `alignment/skill_matcher.py` |
+| Responsibility overlap, project relevance, seniority | `alignment/components.py` |
+| Deterministic 5-component ATS score | `ats/ats_engine.py` |
+| ATS entry point + optional LLM feedback | `ats/ats_scorer.py` |
+| Optional LLM layer (responsibility + prose only) | `alignment/llm_enhancer.py` |
+| Component combination with renormalisation | `alignment/scorer.py` |
+| Full breakdown persisted for later features | `alignment/persistence.py` |
+| Skill categories for partial credit | `parsing/skill_vocabulary.py` |
+
+**What changed:**
+
+| | Before | After |
+|---|---|---|
+| `ats_score` | literally `min(100, alignment + 3)` | 5 real components per `docs/ats-scoring-engine.md` |
+| `ATSScorerService` | existed, called from nowhere | wired, deterministic, LLM optional |
+| Alignment components | skills .70, experience .30 | skills .40, responsibilities .20, projects .20, seniority .20 |
+| Missing input | scored as zero | component dropped, weights renormalise |
+| Skill weighting | all equal | title/frequency weighted |
+| `preferred_skills` | parsed, unused | bonus that adds but never subtracts |
+| Docker vs Kubernetes | scored zero | 0.4 partial credit, reported as `partial_skills` |
+| Gaps | flat lowercase list | display names, ranked P1/P2/P3 |
+| `responsibilities`, `projects[].tech_stack` | parsed, unused | scored components |
+
+**Discrimination** — same resume, two postings:
+
+```
+                        relevant backend role    principal SRE role
+alignment_score                        72.31                 10.97
+skill_match                            90.77                 10.00
+responsibility_match                  100.00                 15.87
+seniority_match                        63.33                 19.00
+```
+
+The LLM layer can only set `responsibility_match` and rewrite prose; it can never move
+`skill_match`, `project_match`, `seniority_match`, or any ATS number, so the headline figures
+stay reproducible whether or not a key is configured.
+
+Test suite: **126 passed** (was 90).
+
 ### Still outstanding (later phases)
-- Scoring weights every mandatory skill equally, and `ats_score` is still `alignment + 3`;
-  `ATSScorerService` remains unwired — **Phase 4**.
 - JD URL fetching is not implemented; the UI's URL field is unused — deferred.
 - Steps 4 (Optimize) and 5 (Analytics) are still not wired — **Phases 6–7**.
-- The frontend still never displays the extracted data — **Phase 8**.
+- The frontend still never displays the extracted data or the new breakdown — **Phase 8**.
+- Embeddings/`pgvector` remain unused; `cultural_fit_score` is still unpopulated.
 
 ---
 

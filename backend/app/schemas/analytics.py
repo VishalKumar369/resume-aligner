@@ -12,6 +12,17 @@ class ExtractionHealthSchema(BaseModel):
     jd_ok: bool = True
     warnings: List[str] = []
 
+class MissingSkillSchema(BaseModel):
+    skill: str
+    importance: str   # mandatory | preferred
+    priority: str     # P1 critical | P2 important | P3 bonus
+    weight: float
+
+class PartialSkillSchema(BaseModel):
+    skill: str
+    covered_by: Optional[str] = None
+    category: Optional[str] = None
+
 class AlignmentResponseSchema(BaseModel):
     resume_id: UUID
     jd_id: UUID
@@ -23,6 +34,16 @@ class AlignmentResponseSchema(BaseModel):
     feedback: str
     improvement_suggestions: List[str]
     extraction_health: Optional[ExtractionHealthSchema] = None
+
+    # Added in Phase 4. Existing fields keep their meaning so the current UI
+    # keeps working; these expose how the score was reached.
+    breakdown: Dict[str, float] = {}
+    component_weights: Dict[str, float] = {}
+    matched_skills: List[str] = []
+    partial_skills: List[PartialSkillSchema] = []
+    missing_skills: List[MissingSkillSchema] = []
+    ats_breakdown: Dict[str, float] = {}
+    ats_warnings: List[str] = []
 
     model_config = ConfigDict(from_attributes=True)
 
