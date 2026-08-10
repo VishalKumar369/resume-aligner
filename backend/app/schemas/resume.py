@@ -20,9 +20,15 @@ class ResumeOut(ResumeBase):
     s3_path: Optional[str] = None
     created_at: datetime
     structured_data: Optional[Dict[str, Any]] = None
+    extraction_meta: Optional[Dict[str, Any]] = None
 
     model_config = ConfigDict(from_attributes=True)
 
 class ResumeUploadSchema(BaseModel):
     label: Optional[str] = None
     # file is handled by FastAPI UploadFile
+
+class ResumeOptimizeRequest(BaseModel):
+    resume_id: UUID
+    jd_id: UUID
+    focus_area: Optional[str] = None

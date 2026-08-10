@@ -1,5 +1,12 @@
 # Analysis feature implementation guide
 
+> **Outdated.** This page overstated what was working: resume text extraction did not exist,
+> and `/alignment/generate` returned 422. See
+> [backend-analysis-and-redesign-plan.md](backend-analysis-and-redesign-plan.md) for the
+> current state and the phase plan, and
+> [backend/docs/extraction-pipeline.md](../backend/docs/extraction-pipeline.md) for the
+> extraction layer delivered in Phase 1.
+
 ## Scope implemented
 The first backend analysis workflow is now wired so the app can:
 - accept a resume upload and parse it into structured JSON
