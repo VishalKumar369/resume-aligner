@@ -16,6 +16,8 @@ import re
 from dataclasses import dataclass, field
 from typing import Any, Dict, List, Optional
 
+from app.schemas.structured import entries
+
 # Component weights, renormalised over whichever components have data.
 WEIGHTS = {
     "keyword_coverage": 0.40,
@@ -251,10 +253,9 @@ class DeterministicATSEngine:
 
     def _all_bullets(self, resume_data: Dict[str, Any]) -> List[str]:
         bullets: List[str] = []
-        for entry in resume_data.get("experience") or []:
-            bullets.extend(entry.get("highlights") or [])
-        for entry in resume_data.get("projects") or []:
-            bullets.extend(entry.get("highlights") or [])
+        for key in ("experience", "projects"):
+            for entry in entries(resume_data, key):
+                bullets.extend(str(item) for item in entry.get("highlights") or [])
         return [bullet for bullet in bullets if bullet and bullet.strip()]
 
     def _contains_word(self, haystack: str, needle: str) -> bool:

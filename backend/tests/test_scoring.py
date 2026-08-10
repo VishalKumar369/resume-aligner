@@ -352,6 +352,43 @@ class TestAlignmentScorer:
         assert "Kubernetes" in result.feedback
 
 
+class TestStalePayloads:
+    """Rows written before Phase 2 stored experience/projects as plain strings."""
+
+    def _legacy(self):
+        return {
+            "personal_info": {"name": "Old Record", "email": "old@example.com"},
+            "skills": {"hard_skills": ["Python"], "soft_skills": ["communication"]},
+            "experience": ["Senior Backend Engineer"],
+            "education": ["bachelor", "university"],
+            "projects": ["Did a thing", "Did another thing"],
+            "certifications": ["aws"],
+            "experience_years": 3,
+        }
+
+    def test_components_survive_a_legacy_payload(self):
+        # These used to raise AttributeError: 'str' object has no attribute 'get'.
+        assert components.project_relevance(self._legacy(), jd()) is None
+        components.responsibility_overlap(self._legacy(), jd())
+
+    def test_ats_engine_survives_a_legacy_payload(self):
+        result = DeterministicATSEngine().score(self._legacy(), jd(), "Python", {})
+        assert 0.0 <= result.score <= 100.0
+
+    @pytest.mark.asyncio
+    async def test_scoring_a_legacy_payload_does_not_crash(self):
+        result = await AlignmentScorerService(use_llm=False).score_resume_to_jd(self._legacy(), jd())
+        assert 0.0 <= result.alignment_score <= 100.0
+
+    @pytest.mark.asyncio
+    async def test_legacy_experience_years_key_is_still_read(self):
+        result = await AlignmentScorerService(use_llm=False).score_resume_to_jd(
+            self._legacy(), jd(min_experience_years=3),
+        )
+        # experience_years: 3 against a 3-year bar is a full match.
+        assert result.breakdown["seniority_match"] == 100.0
+
+
 class TestLLMEnhancement:
     def _payload(self, score=88):
         return json.dumps({

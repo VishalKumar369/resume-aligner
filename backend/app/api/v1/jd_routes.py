@@ -1,7 +1,7 @@
 import uuid
 from typing import List, Optional
 
-from fastapi import APIRouter, Depends, HTTPException
+from fastapi import APIRouter, Depends, HTTPException, Query
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.db.session import get_db
@@ -16,6 +16,7 @@ router = APIRouter()
 # The upload page currently sends these fixed strings for every JD, so they are
 # treated as "nothing supplied" and the parsed values win.
 PLACEHOLDER_VALUES = {"target role", "company", "string", "untitled", "n/a", "-"}
+MAX_PAGE_SIZE = 100
 
 
 @router.post("/upload", response_model=JDOut)
@@ -47,9 +48,13 @@ async def upload_jd(
 
 
 @router.get("/list", response_model=List[JDOut])
-async def list_jds(db: AsyncSession = Depends(get_db)):
+async def list_jds(
+    skip: int = Query(0, ge=0),
+    limit: int = Query(50, ge=1, le=MAX_PAGE_SIZE),
+    db: AsyncSession = Depends(get_db),
+):
     repo = JDRepository(JobDescription, db)
-    return await repo.get_multi()
+    return await repo.get_multi(skip=skip, limit=limit)
 
 
 @router.get("/{jd_id}", response_model=JDOut)

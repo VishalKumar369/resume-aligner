@@ -3,7 +3,7 @@ import uuid
 from io import BytesIO
 from typing import List, Optional
 
-from fastapi import APIRouter, Depends, File, Form, HTTPException, UploadFile
+from fastapi import APIRouter, Depends, File, Form, HTTPException, Query, UploadFile
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.db.session import get_db
@@ -19,6 +19,7 @@ router = APIRouter()
 
 MAX_UPLOAD_BYTES = 5 * 1024 * 1024  # matches the 5MB limit advertised in the UI
 SUPPORTED_TYPES = {FileType.PDF, FileType.DOCX, FileType.TXT}
+MAX_PAGE_SIZE = 100
 
 
 @router.post("/upload", response_model=ResumeOut)
@@ -35,6 +36,18 @@ async def upload_resume(
         raise HTTPException(
             status_code=413,
             detail=f"File is too large. Maximum size is {MAX_UPLOAD_BYTES // (1024 * 1024)}MB.",
+        )
+
+    owner_id = await get_or_create_default_user(db)
+    repo = ResumeRepository(Resume, db)
+    content_hash = hashlib.sha256(file_bytes).hexdigest()
+
+    # Re-uploading the same file returns the existing record: no second copy on
+    # disk, no repeated parse.
+    existing = await repo.get_by_content_hash(owner_id, content_hash)
+    if existing is not None:
+        return ResumeOut.model_validate(existing).model_copy(
+            update={"duplicate_of_existing": True}
         )
 
     parser = ResumeParserService()
@@ -60,16 +73,14 @@ async def upload_resume(
     structured_data = await parser.parse(extraction.text)
 
     storage = get_storage()
-    owner_id = await get_or_create_default_user(db)
     file_path = await storage.upload_file(BytesIO(file_bytes), file.filename)
 
-    repo = ResumeRepository(Resume, db)
     resume = await repo.create(obj_in={
         "owner_id": owner_id,
         "filename": file.filename,
         "label": (label or "").strip() or None,
         "s3_path": file_path,
-        "content_hash": hashlib.sha256(file_bytes).hexdigest(),
+        "content_hash": content_hash,
         "raw_text": extraction.text,
         "structured_data": structured_data,
         "extraction_meta": _extraction_meta(extraction, structured_data),
@@ -79,9 +90,13 @@ async def upload_resume(
 
 
 @router.get("/list", response_model=List[ResumeOut])
-async def list_resumes(db: AsyncSession = Depends(get_db)):
+async def list_resumes(
+    skip: int = Query(0, ge=0),
+    limit: int = Query(50, ge=1, le=MAX_PAGE_SIZE),
+    db: AsyncSession = Depends(get_db),
+):
     repo = ResumeRepository(Resume, db)
-    return await repo.get_multi()
+    return await repo.get_multi(skip=skip, limit=limit)
 
 
 @router.get("/{resume_id}", response_model=ResumeOut)

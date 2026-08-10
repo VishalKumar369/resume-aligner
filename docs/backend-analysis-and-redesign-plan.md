@@ -1,6 +1,6 @@
 # Backend Analysis & Redesign Plan
 
-> Status: **Phases 0–4 complete.** Phases 5–9 pending.
+> Status: **Phases 0–5 complete.** Phases 6–9 pending.
 > Date: 2026-08-09
 > Scope: the 5-step analysis flow (Upload Resume → Add JD → Review Alignment → Optimize Resume → View Analytics)
 >
@@ -568,11 +568,42 @@ stay reproducible whether or not a key is configured.
 
 Test suite: **126 passed** (was 90).
 
+### Phase 5 — persistence & read-back ✅
+See [backend/docs/persistence-and-readback.md](backend/docs/persistence-and-readback.md).
+
+| Component | File |
+|---|---|
+| Alignment history queries, `latest_only`, pagination | `repositories/alignment_repo.py` |
+| Content-hash lookup for idempotent upload | `repositories/resume_repo.py` |
+| `AlignmentSummarySchema` / `AlignmentDetailSchema`; `alignment_id` on generate | `schemas/analytics.py` |
+| `GET /alignment/list`, `GET /alignment/{id}` | `api/v1/alignment_routes.py` |
+| Dedupe on upload + `duplicate_of_existing` flag; pagination | `api/v1/resume_routes.py` |
+| Stale-payload tolerance (`entries()`) | `schemas/structured.py` |
+
+- **Dedupe** keys on the SHA-256 of the file bytes. Re-uploading returns the existing record with
+  no second file and no re-parse. `uploads/` had 14 PDFs for 2 distinct resumes; existing files
+  were left in place by decision.
+- **History** is appended on every generate, so score movement over time is recoverable.
+  `latest_only=true` collapses to the newest run per pair via Postgres `DISTINCT ON`.
+- **List returns scores only**; the full breakdown comes from the detail endpoint.
+- `alignment_id` is now returned by `/alignment/generate`, as `api-design.md` always specified.
+
+**A real bug surfaced here.** Dedupe returned a resume row stored before Phase 2, whose
+`structured_data` kept `experience` as a list of strings. The Phase 4 scorer expects objects and
+crashed with `AttributeError: 'str' object has no attribute 'get'`. `schema_version` existed for
+exactly this but nothing checked it on read. Fixed on both levels: the scorer now re-parses any
+payload that is not the current schema, and readers go through `entries()`, which skips
+non-mapping list items. Regression tests added.
+
+Test suite: **141 passed** (was 126).
+
 ### Still outstanding (later phases)
 - JD URL fetching is not implemented; the UI's URL field is unused — deferred.
-- Steps 4 (Optimize) and 5 (Analytics) are still not wired — **Phases 6–7**.
+- Steps 4 (Optimize) and 5 (Analytics) are still not wired; `/dashboard/summary` and
+  `/learning/roadmap` still return hardcoded values — **Phases 6–7**.
 - The frontend still never displays the extracted data or the new breakdown — **Phase 8**.
 - Embeddings/`pgvector` remain unused; `cultural_fit_score` is still unpopulated.
+- No delete endpoints; ownership is still the demo user, so lists are not per-user scoped.
 
 ---
 

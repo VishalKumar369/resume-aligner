@@ -13,6 +13,8 @@ from app.schemas.analytics import (
     MissingSkillSchema,
     PartialSkillSchema,
 )
+from app.schemas.jd_structured import is_current_jd_schema
+from app.schemas.structured import is_current_schema
 from app.services.alignment import components
 from app.services.alignment.llm_enhancer import LLMAlignmentEnhancer
 from app.services.alignment.persistence import AlignmentPersistenceService
@@ -78,16 +80,21 @@ class AlignmentScorerService:
         resume_text = resume_text or (resume.raw_text if resume else "")
         jd_text = jd_text or (jd.raw_text if jd else "")
 
-        resume_data = (resume.structured_data if resume and resume.structured_data else None) or await self.resume_parser.parse(resume_text)
-        jd_data = (jd.structured_data if jd and jd.structured_data else None) or await self.jd_parser.parse(jd_text)
+        # A payload from an older schema is re-parsed rather than trusted: its
+        # field shapes differ and would score wrongly, or not at all.
+        resume_stored = resume.structured_data if resume else None
+        jd_stored = jd.structured_data if jd else None
 
-        if db is not None and resume is not None and jd is not None:
-            if not resume.structured_data:
+        resume_data = resume_stored if is_current_schema(resume_stored) else await self.resume_parser.parse(resume_text)
+        jd_data = jd_stored if is_current_jd_schema(jd_stored) else await self.jd_parser.parse(jd_text)
+
+        if db is not None:
+            if resume is not None and resume_data is not resume_stored:
                 resume.structured_data = resume_data
-            if not jd.structured_data:
+                db.add(resume)
+            if jd is not None and jd_data is not jd_stored:
                 jd.structured_data = jd_data
-            db.add(resume)
-            db.add(jd)
+                db.add(jd)
 
         result = await self.score_resume_to_jd(
             resume_data,
@@ -101,7 +108,11 @@ class AlignmentScorerService:
 
         if db is not None:
             persistence = AlignmentPersistenceService(db)
-            await persistence.save_alignment(resume_id=resume_id, jd_id=jd_id, result=result.model_dump())
+            saved = await persistence.save_alignment(
+                resume_id=resume_id, jd_id=jd_id, result=result.model_dump()
+            )
+            # Let the caller fetch this run back from GET /alignment/{id}.
+            result.alignment_id = saved.id
 
         return result
 

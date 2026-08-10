@@ -93,3 +93,16 @@ class ResumeStructuredData(BaseModel):
 def is_current_schema(payload: Optional[Dict[str, Any]]) -> bool:
     """Whether a stored `structured_data` blob matches the current contract."""
     return bool(payload) and payload.get("schema_version") == SCHEMA_VERSION
+
+
+def entries(payload: Optional[Dict[str, Any]], key: str) -> List[Dict[str, Any]]:
+    """Read a list-of-objects field, tolerating payloads from an older schema.
+
+    Pre-1.0 records stored `experience`, `education`, and `projects` as lists of
+    plain strings. Consumers that expect objects would crash on those, so
+    anything that is not a mapping is skipped.
+    """
+    values = (payload or {}).get(key) or []
+    if not isinstance(values, list):
+        return []
+    return [item for item in values if isinstance(item, dict)]

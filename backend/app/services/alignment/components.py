@@ -11,6 +11,7 @@ the component and renormalise instead of scoring a missing input as zero.
 import re
 from typing import Any, Dict, List, Optional, Set
 
+from app.schemas.structured import entries
 from app.services.parsing.skill_vocabulary import find_skills
 
 # Words too common to signal anything about a match.
@@ -61,7 +62,7 @@ def project_relevance(
     resume_data: Dict[str, Any], jd_data: Dict[str, Any]
 ) -> Optional[float]:
     """Share of the JD's skills demonstrated in the candidate's projects."""
-    projects = resume_data.get("projects") or []
+    projects = entries(resume_data, "projects")
     if not projects:
         return None
 
@@ -147,9 +148,9 @@ def _singularize(word: str) -> str:
 
 def _resume_narrative(resume_data: Dict[str, Any]) -> str:
     parts: List[str] = [str(resume_data.get("summary") or "")]
-    for entry in resume_data.get("experience") or []:
+    for entry in entries(resume_data, "experience"):
         parts.append(str(entry.get("role") or ""))
         parts.extend(str(item) for item in entry.get("highlights") or [])
-    for entry in resume_data.get("projects") or []:
+    for entry in entries(resume_data, "projects"):
         parts.extend(str(item) for item in entry.get("highlights") or [])
     return "\n".join(parts)

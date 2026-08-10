@@ -1,3 +1,4 @@
+from datetime import datetime
 from typing import Optional, List, Dict, Any
 from uuid import UUID
 from pydantic import BaseModel, ConfigDict
@@ -24,6 +25,8 @@ class PartialSkillSchema(BaseModel):
     category: Optional[str] = None
 
 class AlignmentResponseSchema(BaseModel):
+    # Identifies the stored run, so a client can fetch it back later.
+    alignment_id: Optional[UUID] = None
     resume_id: UUID
     jd_id: UUID
     alignment_score: float
@@ -46,6 +49,31 @@ class AlignmentResponseSchema(BaseModel):
     ats_warnings: List[str] = []
 
     model_config = ConfigDict(from_attributes=True)
+
+class AlignmentSummarySchema(BaseModel):
+    """A stored run, as listed. Scores only - enough for a table or a trend."""
+    id: UUID
+    resume_id: UUID
+    jd_id: UUID
+    alignment_score: float
+    ats_score: float
+    skill_match_score: Optional[float] = None
+    experience_match_score: Optional[float] = None
+    created_at: datetime
+
+class AlignmentDetailSchema(AlignmentSummarySchema):
+    """A stored run with the full analysis, from GET /alignment/{id}."""
+    missing_keywords: List[str] = []
+    matched_skills: List[str] = []
+    partial_skills: List[Dict[str, Any]] = []
+    missing_skills: List[Dict[str, Any]] = []
+    breakdown: Dict[str, float] = {}
+    component_weights: Dict[str, float] = {}
+    ats_breakdown: Dict[str, float] = {}
+    ats_warnings: List[str] = []
+    feedback: str = ""
+    improvement_suggestions: List[str] = []
+    extraction_health: Optional[ExtractionHealthSchema] = None
 
 class ATSScoreSchema(BaseModel):
     score: float
