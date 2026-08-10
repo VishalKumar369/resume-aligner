@@ -1,6 +1,6 @@
 # Backend Analysis & Redesign Plan
 
-> Status: **Phase 0 and Phase 1 complete.** Phases 2–9 pending.
+> Status: **Phases 0, 1 and 2 complete.** Phases 3–9 pending.
 > Date: 2026-08-09
 > Scope: the 5-step analysis flow (Upload Resume → Add JD → Review Alignment → Optimize Resume → View Analytics)
 >
@@ -450,12 +450,49 @@ missing `["backend", "kubernetes"]`, with `extraction_health: {resume_ok: true, 
 
 Test suite: **23 passed**.
 
-### Still broken after Phase 1 (by design — Phase 2 scope)
-- `experience_years` still returns `0`; the heuristic never parses date ranges.
-- `soft_skills` is still the hardcoded constant.
-- `education`, `projects`, and `certifications` still return search terms rather than real entities.
-- `experience` entries still have empty `company` and `highlights`.
-- Steps 4 and 5 are still not wired.
+### Phase 2 — structured resume extraction ✅
+New contract and extractors — see [backend/docs/structured-extraction.md](backend/docs/structured-extraction.md).
+
+| Component | File |
+|---|---|
+| Validated contract, `schema_version` | `app/schemas/structured.py` |
+| Section segmenter | `parsing/sections.py` |
+| Date-range parsing + overlap merging | `parsing/date_utils.py` |
+| Wrapped-line rejoining, bracket-safe splitting | `parsing/line_utils.py` |
+| Deterministic extractor | `parsing/heuristic_resume_extractor.py` |
+| LLM extractor (dormant until a key is set) | `parsing/llm_resume_extractor.py` |
+| Selection + guaranteed fallback | `parsing/extractor_selector.py` |
+| Soft-skill vocabulary; `js` alias no longer fires inside `Express.js` | `parsing/skill_vocabulary.py` |
+| Scorer reads `total_experience_years`, matches on canonical skills | `alignment/scorer.py` |
+
+**Before → after on the same real PDF:**
+
+| Field | Phase 1 | Phase 2 |
+|---|---|---|
+| `total_experience_years` | `0` | `1.9` (merged date ranges) |
+| `experience[].company` | `""` | `The Math Company (MathCo)`, `DataAstraa` |
+| `experience[].dates` | absent | `2025-02 → present` (19mo), `2024-05 → 2024-08` (4mo) |
+| `experience[].highlights` | `[]` | all bullets, unwrapped |
+| `education` | `["bachelor", "university"]` | `B.Tech in Computer Science` @ `Indian Institute of Information Technology, Dharwad` (2021–2025) |
+| `soft_skills` | hardcoded 3 for everyone | detected only when mentioned |
+| `skills.categories` | absent | 6 real categories from the resume |
+| `projects` | 3 arbitrary lines | 3 real projects with tech stacks |
+
+**Effect on alignment** (same resume + JD, before vs after):
+
+```
+experience_match_score:   0.00  ->  95.00     (real experience total)
+skill_match_score:       60.00  ->  66.67     ("React" now matches "React.js")
+alignment_score:         42.00  ->  75.17
+```
+
+Test suite: **62 passed** (was 23).
+
+### Still outstanding (later phases)
+- JD parsing is still the old keyword approach — **Phase 3**.
+- ATS score is still `alignment + 3`; `ATSScorerService` remains unwired — **Phase 4**.
+- Steps 4 (Optimize) and 5 (Analytics) are still not wired — **Phases 6–7**.
+- The frontend still never displays the extracted data — **Phase 8**.
 
 ---
 

@@ -72,7 +72,7 @@ async def upload_resume(
         "content_hash": hashlib.sha256(file_bytes).hexdigest(),
         "raw_text": extraction.text,
         "structured_data": structured_data,
-        "extraction_meta": _extraction_meta(extraction),
+        "extraction_meta": _extraction_meta(extraction, structured_data),
     })
     await db.commit()
     return resume
@@ -102,7 +102,8 @@ async def optimize_resume(payload: ResumeOptimizeRequest):
     )
 
 
-def _extraction_meta(extraction) -> dict:
+def _extraction_meta(extraction, structured_data: dict) -> dict:
+    """One record of how this resume was read: text extraction, then structuring."""
     return {
         "method": extraction.method.value,
         "file_type": extraction.file_type.value,
@@ -112,4 +113,5 @@ def _extraction_meta(extraction) -> dict:
         "used_ocr": extraction.used_ocr,
         "confidence": extraction.confidence,
         "warnings": [warning.value for warning in extraction.warnings],
+        "structuring": (structured_data or {}).get("extraction_meta", {}),
     }

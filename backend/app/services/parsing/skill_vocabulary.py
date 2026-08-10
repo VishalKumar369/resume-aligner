@@ -50,10 +50,12 @@ SKILL_ALIASES: Dict[str, Tuple[str, ...]] = {
 }
 
 # Longer aliases are tested first so "google cloud" is not shadowed by a
-# shorter overlapping term.
+# shorter overlapping term. The lookbehind also rejects a preceding dot, so the
+# "js" alias does not fire inside "Express.js"; a trailing dot stays allowed
+# because skills routinely end a sentence ("... built in Python.").
 _COMPILED: List[Tuple[str, re.Pattern]] = sorted(
     (
-        (canonical, re.compile(rf"(?<![\w+#]){alias}(?![\w+#])", re.IGNORECASE))
+        (canonical, re.compile(rf"(?<![\w+#.]){alias}(?![\w+#])", re.IGNORECASE))
         for canonical, aliases in SKILL_ALIASES.items()
         for alias in aliases
     ),
@@ -68,6 +70,45 @@ def find_skills(text: str) -> List[str]:
 
     found: List[str] = []
     for canonical, pattern in _COMPILED:
+        if canonical not in found and pattern.search(text):
+            found.append(canonical)
+    return sorted(found)
+
+
+# Soft skills are only reported when the resume actually mentions them. The
+# parser used to return a fixed list for every candidate, which was fiction.
+SOFT_SKILL_ALIASES: Dict[str, Tuple[str, ...]] = {
+    "Communication": ("communication", "communicating", "verbal communication"),
+    "Leadership": ("leadership", "led a team", "team lead", "leading teams"),
+    "Teamwork": ("teamwork", "collaboration", "collaborative", "cross-functional"),
+    "Problem Solving": ("problem solving", "problem-solving", "analytical thinking"),
+    "Mentoring": ("mentoring", "mentored", "coaching"),
+    "Stakeholder Management": ("stakeholder management", "stakeholder communication", "client management"),
+    "Time Management": ("time management", "prioritisation", "prioritization"),
+    "Adaptability": ("adaptability", "adaptable", "flexibility"),
+    "Critical Thinking": ("critical thinking",),
+    "Presentation": ("presentation skills", "public speaking", "presenting"),
+    "Ownership": ("ownership", "self-driven", "self driven", "proactive"),
+    "Agile": ("agile", "scrum", "kanban"),
+}
+
+_COMPILED_SOFT: List[Tuple[str, re.Pattern]] = sorted(
+    (
+        (canonical, re.compile(rf"(?<![\w-]){alias}(?![\w-])", re.IGNORECASE))
+        for canonical, aliases in SOFT_SKILL_ALIASES.items()
+        for alias in aliases
+    ),
+    key=lambda item: -len(item[1].pattern),
+)
+
+
+def find_soft_skills(text: str) -> List[str]:
+    """Return soft skills the resume actually mentions, not a fixed list."""
+    if not text:
+        return []
+
+    found: List[str] = []
+    for canonical, pattern in _COMPILED_SOFT:
         if canonical not in found and pattern.search(text):
             found.append(canonical)
     return sorted(found)

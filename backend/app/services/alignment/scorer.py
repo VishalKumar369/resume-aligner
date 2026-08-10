@@ -68,7 +68,7 @@ class AlignmentScorerService:
     async def score_resume_to_jd(
         self, resume_data: Dict[str, Any], jd_data: Dict[str, Any]
     ) -> AlignmentResponseSchema:
-        resume_skills = {skill.lower() for skill in resume_data.get("skills", {}).get("hard_skills", [])}
+        resume_skills = self._resume_skills(resume_data)
         jd_skills = {skill.lower() for skill in jd_data.get("requirements", {}).get("mandatory", [])}
 
         if not resume_skills and not jd_skills:
@@ -88,8 +88,8 @@ class AlignmentScorerService:
         missing_keywords = sorted(jd_skills.difference(resume_skills))
 
         skill_match_score = round((len(matched_skills) / len(jd_skills) * 100.0) if jd_skills else 100.0, 2)
-        experience_years = max(int(resume_data.get("experience_years", 0) or 0), 0)
-        required_experience = max(int(jd_data.get("experience_years", 0) or 0), 1)
+        experience_years = max(self._resume_experience_years(resume_data), 0.0)
+        required_experience = max(float(jd_data.get("experience_years", 0) or 0), 1.0)
         experience_match_score = round(min(100.0, (experience_years / required_experience) * 100.0), 2)
         alignment_score = round((skill_match_score * 0.7) + (experience_match_score * 0.3), 2)
         ats_score = round(min(100.0, alignment_score + 3.0), 2)
@@ -112,6 +112,23 @@ class AlignmentScorerService:
             feedback=feedback,
             improvement_suggestions=suggestions,
         )
+
+    def _resume_skills(self, resume_data: Dict[str, Any]) -> set:
+        """Prefer canonical forms so "React.js" matches a JD asking for "React"."""
+        skills = resume_data.get("skills", {}) or {}
+        normalized = skills.get("normalized") or []
+        source = normalized or skills.get("hard_skills") or []
+        return {str(skill).lower() for skill in source if str(skill).strip()}
+
+    def _resume_experience_years(self, resume_data: Dict[str, Any]) -> float:
+        """Read the computed total, tolerating payloads from the older schema."""
+        value = resume_data.get("total_experience_years")
+        if value is None:
+            value = resume_data.get("experience_years", 0)
+        try:
+            return float(value or 0)
+        except (TypeError, ValueError):
+            return 0.0
 
     def _extraction_health(
         self, resume: Optional[Resume], jd_text: str
