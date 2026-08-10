@@ -63,7 +63,7 @@ class LLMAlignmentEnhancer:
             {"role": "user", "content": self._build_prompt(responsibilities, evidence, jd_data)},
         ]
 
-        raw = await provider.chat_completion(messages, temperature=0.0)
+        raw = await provider.chat_completion(messages, temperature=0.0, json_mode=True)
         payload = self._parse_json(raw)
         if payload is None:
             return None

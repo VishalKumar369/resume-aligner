@@ -87,7 +87,9 @@ class ATSScorerService:
             f"JOB DESCRIPTION:\n{(jd_text or '')[:4000]}"
         )
 
-        raw = await provider.chat_completion([{"role": "user", "content": prompt}], temperature=0.2)
+        raw = await provider.chat_completion(
+            [{"role": "user", "content": prompt}], temperature=0.2, json_mode=True
+        )
         start, end = (raw or "").find("{"), (raw or "").rfind("}")
         if start == -1 or end <= start:
             return {}

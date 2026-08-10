@@ -34,12 +34,12 @@ TARGET_METRIC_RATIO = 0.5
 MIN_BULLET_WORDS = 6
 MAX_BULLET_WORDS = 45
 
-_METRIC = re.compile(
+METRIC_PATTERN = re.compile(
     r"(\d+\s*%|\$\s*\d|₹\s*\d|\b\d+\s*(?:x|k|m|bn|billion|million|thousand|hours?|days?|weeks?)\b|\b\d{2,}\b)",
     re.IGNORECASE,
 )
 
-_ACTION_VERBS = frozenset("""
+ACTION_VERBS = frozenset("""
 built designed developed implemented led managed created delivered launched
 migrated automated optimised optimized improved reduced increased scaled
 architected engineered shipped owned drove spearheaded established introduced
@@ -196,7 +196,7 @@ class DeterministicATSEngine:
             )
             return 0.0
 
-        with_metrics = [bullet for bullet in bullets if _METRIC.search(bullet)]
+        with_metrics = [bullet for bullet in bullets if METRIC_PATTERN.search(bullet)]
         ratio = len(with_metrics) / len(bullets)
 
         if ratio < TARGET_METRIC_RATIO:
@@ -249,7 +249,7 @@ class DeterministicATSEngine:
         if not MIN_BULLET_WORDS <= len(words) <= MAX_BULLET_WORDS:
             return False
         first = re.sub(r"[^a-z]", "", words[0].lower())
-        return first in _ACTION_VERBS
+        return first in ACTION_VERBS
 
     def _all_bullets(self, resume_data: Dict[str, Any]) -> List[str]:
         bullets: List[str] = []

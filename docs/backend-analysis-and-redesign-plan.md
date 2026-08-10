@@ -1,6 +1,6 @@
 # Backend Analysis & Redesign Plan
 
-> Status: **Phases 0–5 complete.** Phases 6–9 pending.
+> Status: **Phases 0–6 complete.** Phases 7–9 pending.
 > Date: 2026-08-09
 > Scope: the 5-step analysis flow (Upload Resume → Add JD → Review Alignment → Optimize Resume → View Analytics)
 >
@@ -597,13 +597,52 @@ non-mapping list items. Regression tests added.
 
 Test suite: **141 passed** (was 126).
 
+### Phase 6 — resume optimizer (Step 4) ✅
+See [backend/docs/optimization-engine.md](backend/docs/optimization-engine.md).
+
+| Component | File |
+|---|---|
+| Anti-fabrication guardrail | `optimization/fact_guard.py` |
+| Evidenced-skill promotion | `optimization/skill_promoter.py` |
+| JD-relevance reordering | `optimization/reorderer.py` |
+| Per-bullet advice | `optimization/bullet_advisor.py` |
+| LLM rewriting behind the guard | `optimization/llm_bullet_rewriter.py` |
+| Orchestration, change log, before/after | `optimization/engine.py` |
+| Shared layout + text/.docx/PDF writers | `documents/layout.py`, `documents/writers.py` |
+| Version history + downloads | `repositories/version_repo.py`, `api/v1/resume_routes.py` |
+| Extra version columns | migration `b7d2f1a4c803` (applied) |
+
+`POST /resume/optimize` was a `501`; it now returns a stored version with both download formats.
+Added `GET /resume/{id}/versions` and `GET /resume/versions/{id}/download?format=docx|pdf`.
+
+**Nothing is invented, and that is enforced mechanically:** skills are promoted only when already
+evidenced in the resume, and every LLM rewrite is diffed against its original and discarded if it
+introduces a figure, technology, or name that was not there. Verified against the live model —
+it blocked rewrites adding "microservices" and "backend".
+
+Measured on a weak resume: `ATS 52.0 → 85.0`, `Alignment 37.5 → 75.0`. On an already-strong
+resume the delta is `0.0`, which is correct: with skill match, responsibility match, and keyword
+coverage already at 100, the only remaining gaps are project relevance and years of experience,
+neither closable honestly.
+
+**Two prerequisites had to be fixed first.** `google-generativeai` was pinned at `0.4.1`, which
+predates Gemini 1.5 GA and cannot route current models (now `0.8.6`). And `GeminiProvider` mapped
+every non-`user` role to `"model"`, so the system prompts written in Phases 2–4 were replayed as
+model turns — the model saw its own instructions as something it had already said. Both fixed and
+live-verified. Note that `gemini-2.0-flash` has **zero** free-tier quota
+(`limit: 0`) and `gemini-1.5-flash` is retired; the default is now `gemini-2.5-flash`.
+
+Test suite: **179 passed** (was 141).
+
 ### Still outstanding (later phases)
+- Step 5 (Analytics) is still not wired; `/dashboard/summary` and `/learning/roadmap` still
+  return hardcoded values — **Phase 7**.
+- The frontend still never displays the extracted data, the score breakdown, or the optimizer
+  output — **Phase 8**.
 - JD URL fetching is not implemented; the UI's URL field is unused — deferred.
-- Steps 4 (Optimize) and 5 (Analytics) are still not wired; `/dashboard/summary` and
-  `/learning/roadmap` still return hardcoded values — **Phases 6–7**.
-- The frontend still never displays the extracted data or the new breakdown — **Phase 8**.
 - Embeddings/`pgvector` remain unused; `cultural_fit_score` is still unpopulated.
 - No delete endpoints; ownership is still the demo user, so lists are not per-user scoped.
+- `google-generativeai` is the deprecated SDK line; migrating to `google-genai` is a future task.
 
 ---
 

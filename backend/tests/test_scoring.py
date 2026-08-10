@@ -74,7 +74,7 @@ class FakeProvider:
         self.responses = list(responses)
         self.calls = []
 
-    async def chat_completion(self, messages, temperature: float = 0.7):
+    async def chat_completion(self, messages, temperature: float = 0.7, json_mode: bool = False):
         self.calls.append(messages)
         return self.responses.pop(0) if self.responses else ""
 
@@ -237,7 +237,7 @@ class TestATSEngine:
     @pytest.mark.asyncio
     async def test_llm_failure_leaves_the_deterministic_result_intact(self):
         class Exploding:
-            async def chat_completion(self, messages, temperature: float = 0.7):
+            async def chat_completion(self, messages, temperature: float = 0.7, json_mode: bool = False):
                 raise RuntimeError("provider exploded")
 
         service = ATSScorerService(provider=Exploding())

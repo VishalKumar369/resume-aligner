@@ -73,7 +73,7 @@ class LLMJDExtractor:
             {"role": "user", "content": self._build_prompt(text)},
         ]
 
-        raw = await provider.chat_completion(messages, temperature=0.0)
+        raw = await provider.chat_completion(messages, temperature=0.0, json_mode=True)
         payload = self._parse_json(raw)
 
         if payload is None:
@@ -83,6 +83,7 @@ class LLMJDExtractor:
                     {"role": "user", "content": "That was not valid JSON. Return the JSON object only."},
                 ],
                 temperature=0.0,
+                json_mode=True,
             )
             payload = self._parse_json(raw)
 

@@ -41,7 +41,7 @@ class Settings(BaseSettings):
 
     LLM_MODEL: str = "gpt-4o-mini"
     GROQ_MODEL: str = "llama-3.3-70b-versatile"
-    GEMINI_MODEL: str = "gemini-2.0-flash"
+    GEMINI_MODEL: str = "gemini-2.5-flash"
 
     @property
     def ai_api_key(self) -> Optional[str]:
