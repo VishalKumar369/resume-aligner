@@ -73,10 +73,11 @@ async def test_jd_parser_extracts_requirements_and_experience_level():
     assert _get_nested(parsed, "role") == "Backend Engineer"
     assert _get_nested(parsed, "company") == "Acme Tech"
 
-    mandatory = _get_nested(parsed, "requirements", "mandatory") or []
+    mandatory = _get_nested(parsed, "requirements", "mandatory_skills") or []
     assert "Python" in mandatory
     assert "Kubernetes" in mandatory
-    assert _get_nested(parsed, "experience_level") == "Senior (5+ years)"
+    assert _get_nested(parsed, "seniority") == "senior"
+    assert _get_nested(parsed, "min_experience_years") == 5
 
 
 @pytest.mark.asyncio

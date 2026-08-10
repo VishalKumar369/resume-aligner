@@ -69,7 +69,7 @@ class AlignmentScorerService:
         self, resume_data: Dict[str, Any], jd_data: Dict[str, Any]
     ) -> AlignmentResponseSchema:
         resume_skills = self._resume_skills(resume_data)
-        jd_skills = {skill.lower() for skill in jd_data.get("requirements", {}).get("mandatory", [])}
+        jd_skills = self._jd_mandatory_skills(jd_data)
 
         if not resume_skills and not jd_skills:
             return AlignmentResponseSchema(
@@ -89,7 +89,7 @@ class AlignmentScorerService:
 
         skill_match_score = round((len(matched_skills) / len(jd_skills) * 100.0) if jd_skills else 100.0, 2)
         experience_years = max(self._resume_experience_years(resume_data), 0.0)
-        required_experience = max(float(jd_data.get("experience_years", 0) or 0), 1.0)
+        required_experience = max(self._jd_required_years(jd_data), 1.0)
         experience_match_score = round(min(100.0, (experience_years / required_experience) * 100.0), 2)
         alignment_score = round((skill_match_score * 0.7) + (experience_match_score * 0.3), 2)
         ats_score = round(min(100.0, alignment_score + 3.0), 2)
@@ -119,6 +119,30 @@ class AlignmentScorerService:
         normalized = skills.get("normalized") or []
         source = normalized or skills.get("hard_skills") or []
         return {str(skill).lower() for skill in source if str(skill).strip()}
+
+    def _jd_mandatory_skills(self, jd_data: Dict[str, Any]) -> set:
+        """Score against must-haves only.
+
+        Nice-to-haves live in `preferred_skills`; counting them as required
+        penalised candidates for skills the posting never demanded.
+        """
+        requirements = jd_data.get("requirements", {}) or {}
+        source = (
+            requirements.get("normalized_mandatory")
+            or requirements.get("mandatory_skills")
+            or requirements.get("mandatory")   # pre-Phase-3 payloads
+            or []
+        )
+        return {str(skill).lower() for skill in source if str(skill).strip()}
+
+    def _jd_required_years(self, jd_data: Dict[str, Any]) -> float:
+        value = jd_data.get("min_experience_years")
+        if value is None:
+            value = jd_data.get("experience_years", 0)
+        try:
+            return float(value or 0)
+        except (TypeError, ValueError):
+            return 0.0
 
     def _resume_experience_years(self, resume_data: Dict[str, Any]) -> float:
         """Read the computed total, tolerating payloads from the older schema."""

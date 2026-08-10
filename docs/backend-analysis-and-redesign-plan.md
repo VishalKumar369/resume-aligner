@@ -1,6 +1,6 @@
 # Backend Analysis & Redesign Plan
 
-> Status: **Phases 0, 1 and 2 complete.** Phases 3–9 pending.
+> Status: **Phases 0–3 complete.** Phases 4–9 pending.
 > Date: 2026-08-09
 > Scope: the 5-step analysis flow (Upload Resume → Add JD → Review Alignment → Optimize Resume → View Analytics)
 >
@@ -488,9 +488,46 @@ alignment_score:         42.00  ->  75.17
 
 Test suite: **62 passed** (was 23).
 
+### Phase 3 — JD parsing parity ✅
+JD side brought up to the same standard — see [backend/docs/jd-extraction.md](backend/docs/jd-extraction.md).
+
+| Component | File |
+|---|---|
+| Validated JD contract, `schema_version` | `app/schemas/jd_structured.py` |
+| Generic section splitting, shared with resumes | `parsing/section_utils.py` |
+| JD section segmenter | `parsing/jd_sections.py` |
+| Deterministic extractor | `parsing/heuristic_jd_extractor.py` |
+| LLM extractor (dormant until a key is set) | `parsing/llm_jd_extractor.py` |
+| Selection + guaranteed fallback | `parsing/jd_extractor_selector.py` |
+| Placeholder title/company replaced by parsed values; empty JD now `422`; `GET /jd/{id}`, `GET /jd/list` | `api/v1/jd_routes.py` |
+| Scorer matches `normalized_mandatory`, reads `min_experience_years` | `alignment/scorer.py` |
+
+**Before → after on the same posting:**
+
+| Field | Phase 2 | Phase 3 |
+|---|---|---|
+| `company` | `""` | `Acme Technologies` |
+| `preferred` | `["nice to have"]` (the cue phrase) | `["Kubernetes", "Terraform", "Kafka"]` |
+| `mandatory` | 8 skills, mixing must-haves with nice-to-haves | 5 genuine must-haves |
+| `"Backend"` from the job title | counted as a required skill | never read from the title |
+| `responsibilities` | the whole JD as one blob | 2 real bullets |
+| `location` / `work_mode` / `employment_type` | absent | `Bengaluru, India` / `hybrid` / `Full-Time` |
+| `seniority` / experience | `"Senior (5+ years)"` string | `seniority: senior`, `min_experience_years: 5` |
+| stored JD title | `"Target Role"` for every row | parsed role |
+
+Two latent bugs were found and fixed along the way:
+- Section aliases were not normalised the way header lines were, so `What we're looking for`
+  and the resume's `extra-curricular` could never match.
+- The resume writes "backends" (plural) while the JD writes "backend", producing a phantom
+  missing skill. Plural aliases are now explicit (a blanket trailing `s` would have made
+  "reacts" match React).
+
+Test suite: **90 passed** (was 62).
+
 ### Still outstanding (later phases)
-- JD parsing is still the old keyword approach — **Phase 3**.
-- ATS score is still `alignment + 3`; `ATSScorerService` remains unwired — **Phase 4**.
+- Scoring weights every mandatory skill equally, and `ats_score` is still `alignment + 3`;
+  `ATSScorerService` remains unwired — **Phase 4**.
+- JD URL fetching is not implemented; the UI's URL field is unused — deferred.
 - Steps 4 (Optimize) and 5 (Analytics) are still not wired — **Phases 6–7**.
 - The frontend still never displays the extracted data — **Phase 8**.
 
