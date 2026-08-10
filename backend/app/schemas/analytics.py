@@ -87,13 +87,56 @@ class SkillGapSchema(BaseModel):
     priority_rank: List[Dict[str, Any]]
 
 class LearningRoadmapSchema(BaseModel):
-    weeks: List[Dict[str, Any]]
+    modules: List[Dict[str, Any]] = []
+    # Alias of `modules`, kept for the original contract.
+    weeks: List[Dict[str, Any]] = []
     total_duration: str
-    resources: List[Dict[str, str]]
+    total_modules: int = 0
+    resources: List[Dict[str, str]] = []
+    skills_covered: List[str] = []
+    jds_considered: int = 0
+    note: Optional[str] = None
+
+class InterviewProbabilitySchema(BaseModel):
+    """A heuristic band, with its basis stated rather than implied."""
+    band: str
+    score: float
+    basis: str
+    caveat: str
 
 class DashboardSummarySchema(BaseModel):
+    totals: Dict[str, int] = {}
     total_resumes: int
     avg_alignment_score: float
-    top_skill_gaps: List[str]
-    recent_activity: List[Dict[str, Any]]
+    best_alignment_score: float = 0.0
+    avg_ats_score: float = 0.0
+    best_ats_score: float = 0.0
     career_readiness_index: float
+    interview_probability: Optional[InterviewProbabilitySchema] = None
+    top_skill_gaps: List[str]
+    skill_gap_detail: List[Dict[str, Any]] = []
+    partial_skills: List[Dict[str, Any]] = []
+    readiness_trend: List[Dict[str, Any]] = []
+    top_company_matches: List[Dict[str, Any]] = []
+    recent_activity: List[Dict[str, Any]]
+    recommended_improvements: List[Dict[str, str]] = []
+    # False when the user has no alignment runs yet, so the UI can show an
+    # empty state instead of a wall of zeros.
+    has_data: bool = False
+
+class CompanyInsightsSchema(BaseModel):
+    company_id: str
+    company: str
+    jd_count: int
+    roles: List[str] = []
+    seniority_levels: List[str] = []
+    locations: List[str] = []
+    work_modes: List[str] = []
+    employment_types: List[str] = []
+    demanded_skills: List[str] = []
+    preferred_skills: List[str] = []
+    your_best_alignment: Optional[float] = None
+    your_average_alignment: Optional[float] = None
+    your_gaps_here: List[Dict[str, Any]] = []
+    postings: List[Dict[str, Any]] = []
+    source: str

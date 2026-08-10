@@ -1,6 +1,6 @@
 # Backend Analysis & Redesign Plan
 
-> Status: **Phases 0–6 complete.** Phases 7–9 pending.
+> Status: **Phases 0–7 complete.** Phases 8–9 pending.
 > Date: 2026-08-09
 > Scope: the 5-step analysis flow (Upload Resume → Add JD → Review Alignment → Optimize Resume → View Analytics)
 >
@@ -634,14 +634,50 @@ live-verified. Note that `gemini-2.0-flash` has **zero** free-tier quota
 
 Test suite: **179 passed** (was 141).
 
+### Phase 7 — analytics, learning roadmap, company insights (Step 5) ✅
+See [backend/docs/analytics-and-learning.md](backend/docs/analytics-and-learning.md).
+
+| Component | File |
+|---|---|
+| Commonality gap across all target JDs | `skill_gap/aggregator.py` |
+| Single-pair gaps via the Phase 4 matcher | `skill_gap/detector.py` |
+| Dashboard aggregation | `dashboard/analytics.py` |
+| Curated official-docs library, categories, prerequisites | `learning/resources.py` |
+| Clustering, dependency ordering, scheduling | `learning/roadmap_generator.py` |
+| Company view from the user's own JDs | `company/insights.py` |
+
+**What these endpoints used to return:** `/dashboard/summary` served a fixed
+`total_resumes: 5` / `avg_alignment_score: 78.4` with activity dated 2024 and a
+`dummy_user_id = uuid.uuid4()` generated per request. `/learning/roadmap` returned
+`"Mastering {skill}"` for a hardcoded skill list, linking to `https://coursera.org/...` for a
+course that does not exist. `/company/{id}/insights` asserted a tech stack, culture, and
+interview tips for any company id — fabricating claims about real organisations.
+
+Gaps now rank by `jd_count × priority_weight`, so the skill three roles demand outranks a single
+P1 — the commonality gap from `skill-gap-engine.md`. Only the newest run per JD counts, so
+re-scoring one role cannot dominate the averages.
+
+**Two places where the spec asked for something that does not exist:**
+- `dashboard-analytics.md` specifies interview probability from "a logistic regression model
+  trained on historical hiring data". There is no such model or data, so the endpoint returns a
+  transparent band that ships its own `basis` and `caveat` rather than implying a trained
+  prediction.
+- The roadmap's resources are each skill's genuine official documentation. A skill with no
+  library entry returns **no** resource rather than a plausible-looking guess.
+
+Live-verified against real data: readiness `69.74`, gaps `Terraform (P2, 5 JDs)` and
+`Kafka (P3, 5 JDs)`, a 2-module 3-week roadmap ordered by priority, and per-company matches with
+`roles_tracked`.
+
+Test suite: **206 passed** (was 179).
+
 ### Still outstanding (later phases)
-- Step 5 (Analytics) is still not wired; `/dashboard/summary` and `/learning/roadmap` still
-  return hardcoded values — **Phase 7**.
-- The frontend still never displays the extracted data, the score breakdown, or the optimizer
-  output — **Phase 8**.
+- The frontend still never displays the extracted data, the score breakdown, the optimizer
+  output, or any of these analytics — every dashboard and learning page is hardcoded — **Phase 8**.
 - JD URL fetching is not implemented; the UI's URL field is unused — deferred.
 - Embeddings/`pgvector` remain unused; `cultural_fit_score` is still unpopulated.
-- No delete endpoints; ownership is still the demo user, so lists are not per-user scoped.
+- No delete endpoints; ownership is still the demo user, so nothing is per-user scoped.
+- `SkillGap`, `LearningPath`, and `DashboardSnapshot` tables remain unused.
 - `google-generativeai` is the deprecated SDK line; migrating to `google-genai` is a future task.
 
 ---
