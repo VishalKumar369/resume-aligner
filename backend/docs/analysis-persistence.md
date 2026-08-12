@@ -1,14 +1,8 @@
 # Analysis persistence
 
-## Persistence model
-The analysis feature stores three main types of data:
-- Resume records with raw text and structured JSON
-- Job description records with raw text and structured JSON
-- Alignment score records with score values and analysis details
-
-## Why this matters
-Persisting the parsed information makes the project reusable for:
-- future optimization prompts
-- analytics dashboards
-- skill-gap recommendations
-- learning roadmaps
+> **Retired.** Superseded by the current persistence and read-back documentation.
+>
+> What replaced it:
+> - [persistence-and-readback.md](persistence-and-readback.md) — what is stored, the endpoint
+>   reference, and how stale payloads are handled
+> - [../../docs/database-schema.md](../../docs/database-schema.md) — the schema as built

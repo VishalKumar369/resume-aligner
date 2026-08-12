@@ -1,5 +1,17 @@
 # Company Intelligence Engine
 
+> **Status: implemented differently, on purpose.**
+> Built as [backend/docs/analytics-and-learning.md](../backend/docs/analytics-and-learning.md).
+>
+> The design called for Glassdoor/Indeed sentiment and tech-blog tracking. What was built reports
+> **only what the user's own saved postings say** — roles, seniority, locations, demanded skills,
+> and their alignment history. The previous placeholder returned an invented tech stack and
+> interview tips for any company id, which is asserting facts about a real organisation from
+> nothing. With no saved posting for a company the endpoint returns 404.
+>
+> Culture-fit scoring is not implemented; `alignment_scores.cultural_fit_score` stays null.
+
+
 ## Overview
 This engine provides insights into specific company hiring patterns, cultures, and technical preferences.
 

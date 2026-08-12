@@ -1,5 +1,15 @@
 # Security
 
+> **Status: partly implemented.**
+>
+> Built: JWT authentication, per-user data scoping (cross-account reads return 404, not 403),
+> upload size and type limits with magic-byte detection, and bcrypt password hashing.
+>
+> Not built: RBAC enforcement (`is_superuser` exists but no route checks it), malware/macro
+> scanning of uploads, PII masking before sending text to an LLM provider, and rate limiting.
+> CORS currently allows all origins when `BACKEND_CORS_ORIGINS` is unset.
+
+
 ## Overview
 Security is a top priority, focusing on data privacy, secure LLM interactions, and PII protection.
 

@@ -1,5 +1,15 @@
 # System Architecture
 
+> **Status: partly implemented.**
+> Next.js frontend, FastAPI backend, and PostgreSQL are as described.
+>
+> Not built: **Redis, Celery workers, and the async engine cluster.** Everything runs
+> synchronously in the API process. `REDIS_URL` and `USE_REDIS` exist in config but no Redis
+> client is instantiated, and `app/utils/cache.py` is unused dead code. The only caching in use is
+> the database-backed LLM result cache, see
+> [backend/docs/llm-budget.md](../backend/docs/llm-budget.md).
+
+
 ## Overview
 Resume-JD-Aligner is designed as a modular platform to handle complex AI workflows, high-throughput parsing, and real-time analytics.
 

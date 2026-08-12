@@ -1,5 +1,16 @@
 # Embeddings Pipeline
 
+> **Status: not implemented.**
+>
+> Nothing in this document was built. No embeddings are generated, `pgvector` is not used, and no
+> table has a vector column. `app/services/resume/embedding.py` is not called by anything.
+>
+> Semantic matching is instead approximated deterministically — a canonical skill vocabulary with
+> aliases, plus content-word overlap for responsibilities. See
+> [backend/docs/scoring-engine.md](../backend/docs/scoring-engine.md). This document remains as the
+> design for a future semantic upgrade.
+
+
 ## Overview
 The Embeddings Pipeline converts unstructured text from resumes and job descriptions into high-dimensional vectors for semantic comparison using `text-embedding-3-large`.
 

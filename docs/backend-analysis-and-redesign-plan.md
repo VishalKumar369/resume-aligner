@@ -1,6 +1,6 @@
 # Backend Analysis & Redesign Plan
 
-> Status: **Phases 0–8 complete.** Phase 9 (docs consolidation) pending.
+> Status: **All nine phases complete.** See [README.md](README.md) for the documentation index.
 > Date: 2026-08-09
 > Scope: the 5-step analysis flow (Upload Resume → Add JD → Review Alignment → Optimize Resume → View Analytics)
 >
@@ -27,7 +27,7 @@ A redesign of the parsing layer is required, not a patch.
 
 ### 2.1 The failure path
 
-Trace of a real PDF upload through [resume_routes.py:24-42](backend/app/api/v1/resume_routes.py#L24-L42):
+Trace of a real PDF upload through [resume_routes.py:24-42](../backend/app/api/v1/resume_routes.py#L24-L42):
 
 ```
 file bytes  →  storage.upload_file()            ✅ file saved to uploads/
@@ -36,7 +36,7 @@ file bytes  →  storage.upload_file()            ✅ file saved to uploads/
             →  repo.create(raw_text=..., structured_data=...)   ❌ garbage persisted
 ```
 
-In [resume_parser.py:36-63](backend/app/services/parsing/resume_parser.py#L36-L63), `_looks_like_binary()` checks for the `%PDF` magic bytes and the ZIP header `PK\x03\x04` (which is what a `.docx` is). On a match, `_decode_text()` returns:
+In [resume_parser.py:36-63](../backend/app/services/parsing/resume_parser.py#L36-L63), `_looks_like_binary()` checks for the `%PDF` magic bytes and the ZIP header `PK\x03\x04` (which is what a `.docx` is). On a match, `_decode_text()` returns:
 
 ```
 "[Binary or non-text content stored as file reference only for Vishal_Kumar_Resume.pdf]"
@@ -65,7 +65,7 @@ Because `experience_years = 0` and `hard_skills = []`, the alignment scorer then
 - **No PDF library installed.** `requirements.txt` contains no `pypdf`, `PyMuPDF`, `pdfplumber`, or `pdfminer.six`.
 - **No DOCX library installed.** No `python-docx`.
 - **No OCR.** No `pytesseract` / `pdf2image` / Pillow OCR path, despite the intended pipeline calling for an OCR fallback on empty text.
-- **No LLM extraction wired.** `AIFactory` exists in [factory.py](backend/app/services/ai/factory.py) but **neither `ResumeParserService` nor `JDParserService` ever calls it.**
+- **No LLM extraction wired.** `AIFactory` exists in [factory.py](../backend/app/services/ai/factory.py) but **neither `ResumeParserService` nor `JDParserService` ever calls it.**
 - **No API keys configured.** `.env` has `OPENAI_API_KEY="sk-..."` (placeholder, 8 chars), `GROQ_API_KEY=""`, `GEMINI_API_KEY=""`. Any LLM call today would fail with an auth error.
 - **PostgreSQL is running** and reachable on `localhost:5432`.
 - **8 real PDFs already sit in `backend/uploads/`** (3 distinct files, uploaded repeatedly — no dedupe).
@@ -74,7 +74,7 @@ Because `experience_years = 0` and `hard_skills = []`, the alignment scorer then
 
 Even with correct text, the current parser cannot produce reliable structure:
 
-- **Skills** are matched against a hardcoded 24-item list ([resume_parser.py:6-11](backend/app/services/parsing/resume_parser.py#L6-L11)). Anything outside that list is invisible.
+- **Skills** are matched against a hardcoded 24-item list ([resume_parser.py:6-11](../backend/app/services/parsing/resume_parser.py#L6-L11)). Anything outside that list is invisible.
 - **Soft skills** are a fixed constant returned for every resume.
 - **Name** is "the first non-empty line" — wrong for any resume that leads with a header, logo caption, or contact block.
 - **Experience** matches any line containing `engineer|developer|manager|lead|analyst|architect` and caps at 3 entries, with `company` always `""` and `highlights` always `[]`.
@@ -91,13 +91,13 @@ These break the flow independently of parsing.
 
 ### 3.1 `POST /alignment/generate` — Step 3 is broken
 
-[alignment_routes.py:12-16](backend/app/api/v1/alignment_routes.py#L12-L16) declares:
+[alignment_routes.py:12-16](../backend/app/api/v1/alignment_routes.py#L12-L16) declares:
 
 ```python
 async def generate_alignment(resume_id: uuid.UUID, jd_id: uuid.UUID, db=Depends(get_db)):
 ```
 
-Bare scalar parameters in FastAPI bind as **query parameters**. The frontend sends a JSON body ([api.ts:60-61](frontend/services/api.ts#L60-L61)):
+Bare scalar parameters in FastAPI bind as **query parameters**. The frontend sends a JSON body ([api.ts:60-61](../frontend/services/api.ts#L60-L61)):
 
 ```ts
 api.post("/alignment/generate", { resume_id: resumeId, jd_id: jdId })
@@ -107,7 +107,7 @@ Result: **HTTP 422**, and the UI shows "Alignment failed". Step 3 can never succ
 
 ### 3.2 `POST /resume/optimize` — same issue, and it is a stub
 
-Same query-vs-body mismatch, and the handler returns a hardcoded response ([resume_routes.py:51-64](backend/app/api/v1/resume_routes.py#L51-L64)) with a fake filename and fake change list. No optimization engine exists.
+Same query-vs-body mismatch, and the handler returns a hardcoded response ([resume_routes.py:51-64](../backend/app/api/v1/resume_routes.py#L51-L64)) with a fake filename and fake change list. No optimization engine exists.
 
 ### 3.3 `POST /resume/upload` — `label` silently dropped
 
@@ -115,7 +115,7 @@ Same query-vs-body mismatch, and the handler returns a hardcoded response ([resu
 
 ### 3.4 Steps 4 and 5 never call the backend
 
-- **Step 4 (Optimize)** in [upload/page.tsx:87-90](frontend/app/upload/page.tsx#L87-L90) just does `setCurrentStep(5)`. The "ATS Score went from 74% → 92%" text is hardcoded.
+- **Step 4 (Optimize)** in [upload/page.tsx:87-90](../frontend/app/upload/page.tsx#L87-L90) just does `setCurrentStep(5)`. The "ATS Score went from 74% → 92%" text is hardcoded.
 - **Step 5 (Analytics)** renders values from the step-3 response only; it never calls `/dashboard/summary`.
 
 ### 3.5 No read-back endpoints
@@ -126,12 +126,12 @@ There is no `GET /resume/{id}`, `GET /jd/{id}`, or `GET /alignment/{id}`. The fr
 
 ## 4. Scoring engine defects
 
-In [scorer.py](backend/app/services/alignment/scorer.py):
+In [scorer.py](../backend/app/services/alignment/scorer.py):
 
 1. **Dead code.** Everything after the `else` block's `return` (the trailing ~25 lines) is unreachable and duplicates the live logic.
 2. **Exact-string skill matching.** `resume_skills ∩ jd_skills` on capitalized tokens. No normalization, no aliasing — `"Node"` ≠ `"Node.js"`, `"K8s"` ≠ `"Kubernetes"`, `"Postgres"` ≠ `"PostgreSQL"`. Match rates are artificially low.
 3. **Fabricated ATS score.** `ats_score = min(100, alignment_score + 3)`. It is not an ATS evaluation at all.
-4. **`ATSScorerService` is orphaned.** The LLM-based ATS scorer in [ats_scorer.py](backend/app/services/ats/ats_scorer.py) is never called by any route.
+4. **`ATSScorerService` is orphaned.** The LLM-based ATS scorer in [ats_scorer.py](../backend/app/services/ats/ats_scorer.py) is never called by any route.
 5. **`cultural_fit_score`** column exists in the model and is never populated.
 6. **Empty-input case** returns `alignment_score = 0` with no diagnostic explaining that extraction failed — indistinguishable from a genuinely bad match. This is exactly what the user is seeing.
 7. **No semantic similarity.** `embeddings-pipeline.md` and `pgvector` in `requirements.txt` describe a vector path; `app/services/resume/embedding.py` is not used by the alignment flow.
@@ -424,7 +424,7 @@ Small, independently testable increments. Each phase ends green before the next 
 | Fixed the 2 failing tests and a list-indexing bug in the test helper | `tests/test_analysis_workflow.py` |
 
 ### Phase 1 — document text extraction ✅
-New package `app/services/extraction/` — see [backend/docs/extraction-pipeline.md](backend/docs/extraction-pipeline.md).
+New package `app/services/extraction/` — see [backend/docs/extraction-pipeline.md](../backend/docs/extraction-pipeline.md).
 
 - Magic-byte file type detection (does not trust filename or `Content-Type`)
 - PDF via pdfplumber with a pypdf fallback; DOCX via python-docx incl. tables and headers
@@ -451,7 +451,7 @@ missing `["backend", "kubernetes"]`, with `extraction_health: {resume_ok: true, 
 Test suite: **23 passed**.
 
 ### Phase 2 — structured resume extraction ✅
-New contract and extractors — see [backend/docs/structured-extraction.md](backend/docs/structured-extraction.md).
+New contract and extractors — see [backend/docs/structured-extraction.md](../backend/docs/structured-extraction.md).
 
 | Component | File |
 |---|---|
@@ -489,7 +489,7 @@ alignment_score:         42.00  ->  75.17
 Test suite: **62 passed** (was 23).
 
 ### Phase 3 — JD parsing parity ✅
-JD side brought up to the same standard — see [backend/docs/jd-extraction.md](backend/docs/jd-extraction.md).
+JD side brought up to the same standard — see [backend/docs/jd-extraction.md](../backend/docs/jd-extraction.md).
 
 | Component | File |
 |---|---|
@@ -525,7 +525,7 @@ Two latent bugs were found and fixed along the way:
 Test suite: **90 passed** (was 62).
 
 ### Phase 4 — alignment & ATS scoring redesign ✅
-Scoring now uses the data Phases 2–3 extract — see [backend/docs/scoring-engine.md](backend/docs/scoring-engine.md).
+Scoring now uses the data Phases 2–3 extract — see [backend/docs/scoring-engine.md](../backend/docs/scoring-engine.md).
 
 | Component | File |
 |---|---|
@@ -569,7 +569,7 @@ stay reproducible whether or not a key is configured.
 Test suite: **126 passed** (was 90).
 
 ### Phase 5 — persistence & read-back ✅
-See [backend/docs/persistence-and-readback.md](backend/docs/persistence-and-readback.md).
+See [backend/docs/persistence-and-readback.md](../backend/docs/persistence-and-readback.md).
 
 | Component | File |
 |---|---|
@@ -598,7 +598,7 @@ non-mapping list items. Regression tests added.
 Test suite: **141 passed** (was 126).
 
 ### Phase 6 — resume optimizer (Step 4) ✅
-See [backend/docs/optimization-engine.md](backend/docs/optimization-engine.md).
+See [backend/docs/optimization-engine.md](../backend/docs/optimization-engine.md).
 
 | Component | File |
 |---|---|
@@ -635,7 +635,7 @@ live-verified. Note that `gemini-2.0-flash` has **zero** free-tier quota
 Test suite: **179 passed** (was 141).
 
 ### Phase 7 — analytics, learning roadmap, company insights (Step 5) ✅
-See [backend/docs/analytics-and-learning.md](backend/docs/analytics-and-learning.md).
+See [backend/docs/analytics-and-learning.md](../backend/docs/analytics-and-learning.md).
 
 | Component | File |
 |---|---|
@@ -672,7 +672,7 @@ Live-verified against real data: readiness `69.74`, gaps `Terraform (P2, 5 JDs)`
 Test suite: **206 passed** (was 179).
 
 ### Phase 8 — frontend integration + real per-user ownership ✅
-See [frontend/docs/frontend-integration.md](frontend/docs/frontend-integration.md).
+See [frontend/docs/frontend-integration.md](../frontend/docs/frontend-integration.md).
 
 **Auth was decorative.** Login returned a valid JWT and every data route then ignored it, serving
 a shared demo user — two accounts saw each other's resumes. `app/api/deps.py` adds
@@ -698,7 +698,7 @@ Verified reproducible: the same stored pair optimized three times gave identical
 Test suite: **218 passed** (was 206). Frontend builds clean: 13 routes, `tsc --noEmit` silent.
 
 ### LLM budget, caching, and quota handling ✅
-See [backend/docs/llm-budget.md](backend/docs/llm-budget.md).
+See [backend/docs/llm-budget.md](../backend/docs/llm-budget.md).
 
 Investigating the Phase 8 open issue found the real cause:
 

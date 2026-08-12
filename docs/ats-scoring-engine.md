@@ -1,5 +1,14 @@
 # ATS Scoring Engine
 
+> **Status: implemented.**
+> Built as [backend/docs/scoring-engine.md](../backend/docs/scoring-engine.md).
+>
+> All five components and their documented weights are as specified. Deviation: the engine is
+> **deterministic** rather than LLM-based, so scores are reproducible and cost nothing. Structural
+> safety is read from the extraction record, which catches an image-only PDF that no parser can
+> read.
+
+
 ## Overview
 The ATS (Applicant Tracking System) Scoring Engine evaluates a resume based on the technical "readability" and "parseability" by typical HR software.
 

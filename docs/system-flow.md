@@ -1,5 +1,14 @@
 # System Flow
 
+> **Status: implemented, with one structural deviation.**
+> The five-step flow works end to end. See
+> [docs/README.md](README.md) for the per-stage implementation docs.
+>
+> Deviation: **there is no task queue.** Parsing, scoring, and optimization run synchronously
+> inside the request; the `[Queue Task]` / `[Task Ready]` exchange in the diagram below does not
+> exist. Embedding generation and cosine similarity are also not implemented.
+
+
 ## End-to-End Workflow Diagram
 ```text
 USER                  FRONTEND              BACKEND              ENGINES              DB/STORAGE
