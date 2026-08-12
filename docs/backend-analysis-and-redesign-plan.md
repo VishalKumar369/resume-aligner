@@ -1,6 +1,6 @@
 # Backend Analysis & Redesign Plan
 
-> Status: **Phases 0–7 complete.** Phases 8–9 pending.
+> Status: **Phases 0–8 complete.** Phase 9 (docs consolidation) pending.
 > Date: 2026-08-09
 > Scope: the 5-step analysis flow (Upload Resume → Add JD → Review Alignment → Optimize Resume → View Analytics)
 >
@@ -671,9 +671,37 @@ Live-verified against real data: readiness `69.74`, gaps `Terraform (P2, 5 JDs)`
 
 Test suite: **206 passed** (was 179).
 
-### Still outstanding (later phases)
-- The frontend still never displays the extracted data, the score breakdown, the optimizer
-  output, or any of these analytics — every dashboard and learning page is hardcoded — **Phase 8**.
+### Phase 8 — frontend integration + real per-user ownership ✅
+See [frontend/docs/frontend-integration.md](frontend/docs/frontend-integration.md).
+
+**Auth was decorative.** Login returned a valid JWT and every data route then ignored it, serving
+a shared demo user — two accounts saw each other's resumes. `app/api/deps.py` adds
+`get_current_user`, and every route and analytics service is now scoped to the token's owner.
+Alignments and versions have no owner column, so they are constrained through their resume.
+Verified: `401` without a token, `404` on every cross-account read, `0` rows for a second account.
+
+**Every page now reads real data** — dashboard, skills, readiness, resume-versions, learning,
+company, and all five upload steps. Each handles loading, error, and a `has_data`-driven empty
+state.
+
+**Step 1 shows what was extracted** — parsed name, contact, skills by category, experience with
+dates, confidence, and warnings, with a Replace file action. This is the direct answer to the
+original complaint; a bad parse is now visible before three more steps run on it.
+
+**A scoring inconsistency was found and fixed during verification.** Step 3 reported alignment
+`58.0` while step 4 called its baseline `68.3` for the same pair. The optimizer makes three model
+calls in quick succession, and under free-tier rate limits one side fell back mid-run, shifting
+the delta. The optimizer now scores before/after deterministically so the comparison is
+like-for-like, and returns a `scoring_note` explaining why it can differ from the headline score.
+Verified reproducible: the same stored pair optimized three times gave identical numbers.
+
+Test suite: **218 passed** (was 206). Frontend builds clean: 13 routes, `tsc --noEmit` silent.
+
+### Open issue found during Phase 8 verification
+LLM resume extraction sometimes produces **worse** structured data than the heuristic. Two runs
+of the same PDF: one fell back to the heuristic and scored `68.3`; another where the LLM
+extractor succeeded scored `32.0`. Rate-limit fallbacks are also frequent. Worth investigating
+before relying on the LLM extractor — the heuristic may be the better default.
 - JD URL fetching is not implemented; the UI's URL field is unused — deferred.
 - Embeddings/`pgvector` remain unused; `cultural_fit_score` is still unpopulated.
 - No delete endpoints; ownership is still the demo user, so nothing is per-user scoped.
