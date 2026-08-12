@@ -9,11 +9,15 @@ failing the upload.
 import logging
 from typing import Optional
 
+from app.services.ai.factory import AIFactory
+
 from app.schemas.structured import ResumeStructuredData
 from app.services.parsing.heuristic_resume_extractor import HeuristicResumeExtractor
 from app.services.parsing.llm_resume_extractor import LLMResumeExtractor
 
 logger = logging.getLogger(__name__)
+
+FEATURE = "resume_extraction"
 
 
 class ResumeExtractorSelector:
@@ -39,6 +43,7 @@ class ResumeExtractorSelector:
                 data.extraction_meta["fallback_used"] = False
                 return data
             except Exception as exc:  # noqa: BLE001 - any failure must degrade, not raise
+                AIFactory.note_failure(exc)
                 logger.warning("LLM extraction failed, falling back to heuristic: %s", exc)
                 data = self.heuristic.extract(text)
                 data.extraction_meta["fallback_used"] = True
@@ -48,12 +53,15 @@ class ResumeExtractorSelector:
         data = self.heuristic.extract(text)
         data.extraction_meta["fallback_used"] = False
         data.extraction_meta["llm_available"] = False
+        reason = AIFactory.unavailable_reason(FEATURE)
+        if reason:
+            data.extraction_meta["llm_skipped_reason"] = reason
         return data
 
     def _should_try_llm(self) -> bool:
         if self._prefer_llm is not None:
             return self._prefer_llm
-        return LLMResumeExtractor.is_available()
+        return AIFactory.is_available("resume_extraction")
 
     def _empty_result(self) -> ResumeStructuredData:
         data = ResumeStructuredData()

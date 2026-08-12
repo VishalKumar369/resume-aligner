@@ -1,3 +1,5 @@
+import logging
+import time
 from abc import ABC, abstractmethod
 from typing import Dict, List, Optional, Tuple
 
@@ -6,6 +8,8 @@ from groq import AsyncGroq
 from openai import AsyncOpenAI
 
 from app.core.config import settings
+
+logger = logging.getLogger(__name__)
 
 
 class AIProvider(ABC):
@@ -152,15 +156,72 @@ class AIUnavailableError(RuntimeError):
     """Raised when an LLM is requested but no usable API key is configured."""
 
 
-class AIFactory:
-    @staticmethod
-    def is_available() -> bool:
-        """Whether an LLM call can be made right now.
+# Substrings that identify a quota rejection across providers.
+_QUOTA_MARKERS = ("resourceexhausted", "429", "quota", "rate limit", "too many requests")
 
-        Callers use this to choose the LLM path or fall back to deterministic
-        parsing, instead of discovering the missing key as an auth failure.
+
+class AIFactory:
+    # Set when a provider reports quota exhaustion. Until it passes, calls are
+    # skipped rather than retried: free tiers meter per day, so a rejection now
+    # means the next request fails too.
+    _cooldown_until: float = 0.0
+    _last_reason: Optional[str] = None
+
+    @staticmethod
+    def is_available(feature: Optional[str] = None) -> bool:
+        """Whether a model call can be made right now.
+
+        `feature` additionally checks that feature's switch, so the daily budget
+        is only spent where it was allocated.
         """
-        return settings.has_ai_credentials
+        if not settings.has_ai_credentials:
+            return False
+        if feature is not None and not settings.llm_enabled_for(feature):
+            return False
+        return not AIFactory.in_cooldown()
+
+    @staticmethod
+    def in_cooldown() -> bool:
+        return time.monotonic() < AIFactory._cooldown_until
+
+    @staticmethod
+    def note_failure(exc: BaseException) -> bool:
+        """Record a failed call. Returns True if it was a quota rejection.
+
+        A quota rejection starts a cooldown so the rest of the session degrades
+        to deterministic behaviour immediately instead of retrying.
+        """
+        text = f"{type(exc).__name__} {exc}".lower()
+        if not any(marker in text for marker in _QUOTA_MARKERS):
+            return False
+
+        AIFactory._cooldown_until = time.monotonic() + settings.LLM_QUOTA_COOLDOWN_SECONDS
+        AIFactory._last_reason = (
+            "The daily quota for this model has been reached, so AI features are "
+            "using their deterministic fallback."
+        )
+        logger.warning("AI provider quota exhausted; cooling down: %s", str(exc)[:200])
+        return True
+
+    @staticmethod
+    def unavailable_reason(feature: Optional[str] = None) -> Optional[str]:
+        """A user-facing explanation of why a model was not used, if it was not."""
+        if not settings.has_ai_credentials:
+            return "No AI provider key is configured, so deterministic parsing was used."
+        if AIFactory.in_cooldown():
+            return AIFactory._last_reason
+        if feature is not None and not settings.llm_enabled_for(feature):
+            return (
+                f"AI is disabled for {feature.replace('_', ' ')} "
+                f"(LLM_FOR_{feature.upper()}=false)."
+            )
+        return None
+
+    @staticmethod
+    def reset_quota_state() -> None:
+        """Clear the cooldown. Used by tests and after a key change."""
+        AIFactory._cooldown_until = 0.0
+        AIFactory._last_reason = None
 
     @staticmethod
     def get_provider() -> AIProvider:

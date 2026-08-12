@@ -70,10 +70,31 @@ class LLMBulletRewriter:
     def __init__(self, provider=None, guard: Optional[FactGuard] = None):
         self._provider = provider
         self.guard = guard or FactGuard()
+        # The raw model response of the last call, so the engine can cache it.
+        self.last_payload: Optional[Dict[str, Any]] = None
 
     @staticmethod
     def is_available() -> bool:
-        return AIFactory.is_available()
+        return AIFactory.is_available("bullet_rewriting")
+
+    def cache_fingerprint(self, resume_data: Dict[str, Any], jd_data: Dict[str, Any]) -> list:
+        """Inputs that determine the rewrite, for cache keying."""
+        bullets = [item.original for item in self._collect_bullets(resume_data)]
+        requirements = jd_data.get("requirements", {}) or {}
+        return [
+            jd_data.get("role") or "",
+            requirements.get("mandatory_skills") or [],
+            jd_data.get("responsibilities") or [],
+            bullets,
+        ]
+
+    def rebuild(self, payload: Dict[str, Any], resume_data: Dict[str, Any]) -> "RewriteResult":
+        """Re-verify a cached model response against the current resume.
+
+        The guard runs again rather than trusting a stored verdict, so a change
+        to the rules applies to cached results too.
+        """
+        return self._verify(payload, self._collect_bullets(resume_data))
 
     async def rewrite(
         self, resume_data: Dict[str, Any], jd_data: Dict[str, Any]
@@ -94,6 +115,7 @@ class LLMBulletRewriter:
             logger.warning("Bullet rewriter returned unparseable output")
             return RewriteResult(considered=len(candidates))
 
+        self.last_payload = payload
         return self._verify(payload, candidates)
 
     # ---------------------------------------------------------------- internals

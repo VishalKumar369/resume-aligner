@@ -10,6 +10,7 @@ class JobDescription(Base):
     title = Column(String, nullable=False)
     company_name = Column(String)
     raw_text = Column(String)
+    content_hash = Column(String, index=True) # SHA-256 of the posting text
     structured_data = Column(JSON) # Parsed requirements, keywords, etc.
     url = Column(String)
 

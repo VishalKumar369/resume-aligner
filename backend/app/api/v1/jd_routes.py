@@ -1,3 +1,4 @@
+import hashlib
 import uuid
 from typing import List, Optional
 
@@ -32,14 +33,22 @@ async def upload_jd(
             detail="Job description text is required. Paste the posting to continue.",
         )
 
-    structured_data = await JDParserService().parse(raw_text)
-
     repo = JDRepository(JobDescription, db)
+    content_hash = hashlib.sha256(raw_text.encode("utf-8")).hexdigest()
+
+    # The same posting pasted twice costs nothing: parsing it may spend a model
+    # call, and free-tier quotas are metered per day.
+    existing = await repo.get_by_content_hash(owner_id, content_hash)
+    if existing is not None:
+        return existing
+
+    structured_data = await JDParserService().parse(raw_text)
     jd = await repo.create(obj_in={
         "owner_id": owner_id,
         "title": _resolve(jd_in.title, structured_data.get("role")) or "Untitled role",
         "company_name": _resolve(jd_in.company_name, structured_data.get("company")),
         "raw_text": raw_text,
+        "content_hash": content_hash,
         "structured_data": structured_data,
         "url": str(jd_in.url) if jd_in.url else None,
     })

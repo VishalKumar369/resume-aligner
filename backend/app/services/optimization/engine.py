@@ -15,6 +15,8 @@ import logging
 from dataclasses import dataclass, field
 from typing import Any, Dict, List, Optional
 
+from app.services.ai.cache import LLMCache, cache_key
+from app.services.ai.factory import AIFactory
 from app.services.alignment.scorer import AlignmentScorerService
 from app.services.ats.ats_scorer import ATSScorerService
 from app.services.documents.writers import render_text
@@ -39,6 +41,7 @@ class OptimizationResult:
     alignment_score: float = 0.0
 
     used_llm: bool = False
+    from_cache: bool = False
     llm_note: Optional[str] = None
     # Explains why these figures can differ from the headline alignment score.
     scoring_note: str = (
@@ -70,6 +73,7 @@ class OptimizationEngine:
         ats_scorer: Optional[ATSScorerService] = None,
         alignment_scorer: Optional[AlignmentScorerService] = None,
         use_llm: Optional[bool] = None,
+        db=None,
     ):
         self.promoter = promoter or SkillPromoter()
         self.reorderer = reorderer or Reorderer()
@@ -83,6 +87,7 @@ class OptimizationEngine:
         # back mid-run and silently shift the delta.
         self.alignment_scorer = alignment_scorer or AlignmentScorerService(use_llm=False)
         self._use_llm = use_llm
+        self.cache = LLMCache(db)
 
     async def optimize(
         self,
@@ -141,21 +146,45 @@ class OptimizationEngine:
     async def _rewrite_bullets(
         self, optimized: Dict[str, Any], jd_data: Dict[str, Any], result: OptimizationResult
     ) -> set:
+        key = cache_key("bullet_rewriting", *self.rewriter.cache_fingerprint(optimized, jd_data))
+
+        # A previous run on identical bullets and requirements already paid for
+        # this. Free-tier quotas are daily, so not re-spending matters.
+        cached = await self.cache.get(key)
+        if cached is not None:
+            rewrites = self.rewriter.rebuild(cached, optimized)
+            result.used_llm = True
+            result.from_cache = True
+            return self._apply_rewrites(optimized, rewrites, result)
+
         if not self._should_use_llm():
             result.llm_note = (
-                "No language model is configured, so bullets were not rewritten. "
-                "Suggestions are listed instead."
-            )
+                AIFactory.unavailable_reason("bullet_rewriting")
+                or "No language model is configured, so bullets were not rewritten."
+            ) + " Suggestions are listed instead."
             return set()
 
         try:
             rewrites = await self.rewriter.rewrite(optimized, jd_data)
         except Exception as exc:  # noqa: BLE001 - optimization must not fail on the model
+            quota = AIFactory.note_failure(exc)
             logger.warning("Bullet rewriting failed, keeping the original bullets: %s", exc)
-            result.llm_note = f"Bullet rewriting was skipped: {str(exc)[:150]}"
+            result.llm_note = (
+                AIFactory.unavailable_reason("bullet_rewriting")
+                if quota
+                else f"Bullet rewriting was skipped: {str(exc)[:150]}"
+            )
             return set()
 
+        if self.rewriter.last_payload is not None:
+            await self.cache.put(key, "bullet_rewriting", self.rewriter.last_payload)
+
         result.used_llm = True
+        return self._apply_rewrites(optimized, rewrites, result)
+
+    def _apply_rewrites(
+        self, optimized: Dict[str, Any], rewrites, result: OptimizationResult
+    ) -> set:
         result.rejected_rewrites = rewrites.rejected
 
         applied = 0
@@ -236,4 +265,4 @@ class OptimizationEngine:
     def _should_use_llm(self) -> bool:
         if self._use_llm is not None:
             return self._use_llm
-        return LLMBulletRewriter.is_available()
+        return AIFactory.is_available("bullet_rewriting")

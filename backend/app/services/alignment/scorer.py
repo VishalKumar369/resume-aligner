@@ -16,6 +16,7 @@ from app.schemas.analytics import (
 from app.schemas.jd_structured import is_current_jd_schema
 from app.schemas.structured import is_current_schema
 from app.services.alignment import components
+from app.services.ai.factory import AIFactory
 from app.services.alignment.llm_enhancer import LLMAlignmentEnhancer
 from app.services.alignment.persistence import AlignmentPersistenceService
 from app.services.alignment.skill_matcher import SkillMatcher, SkillMatchReport
@@ -257,13 +258,14 @@ class AlignmentScorerService:
         """
         use_llm = self._use_llm
         if use_llm is None:
-            use_llm = LLMAlignmentEnhancer.is_available()
+            use_llm = AIFactory.is_available("alignment")
         if not use_llm:
             return None
 
         try:
             return await self.enhancer.enhance(resume_data, jd_data)
         except Exception as exc:  # noqa: BLE001 - enhancement is optional
+            AIFactory.note_failure(exc)
             logger.warning("LLM alignment enhancement failed, using deterministic score: %s", exc)
             return None
 

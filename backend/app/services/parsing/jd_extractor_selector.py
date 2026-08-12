@@ -7,11 +7,15 @@ is never load-bearing, so a JD upload cannot fail because of the provider.
 import logging
 from typing import Optional
 
+from app.services.ai.factory import AIFactory
+
 from app.schemas.jd_structured import JDStructuredData
 from app.services.parsing.heuristic_jd_extractor import HeuristicJDExtractor
 from app.services.parsing.llm_jd_extractor import LLMJDExtractor
 
 logger = logging.getLogger(__name__)
+
+FEATURE = "jd_extraction"
 
 
 class JDExtractorSelector:
@@ -36,6 +40,7 @@ class JDExtractorSelector:
                 data.extraction_meta["fallback_used"] = False
                 return data
             except Exception as exc:  # noqa: BLE001 - any failure must degrade, not raise
+                AIFactory.note_failure(exc)
                 logger.warning("LLM JD extraction failed, falling back to heuristic: %s", exc)
                 data = self.heuristic.extract(text)
                 data.extraction_meta["fallback_used"] = True
@@ -45,12 +50,15 @@ class JDExtractorSelector:
         data = self.heuristic.extract(text)
         data.extraction_meta["fallback_used"] = False
         data.extraction_meta["llm_available"] = False
+        reason = AIFactory.unavailable_reason(FEATURE)
+        if reason:
+            data.extraction_meta["llm_skipped_reason"] = reason
         return data
 
     def _should_try_llm(self) -> bool:
         if self._prefer_llm is not None:
             return self._prefer_llm
-        return LLMJDExtractor.is_available()
+        return AIFactory.is_available("jd_extraction")
 
     def _empty_result(self) -> JDStructuredData:
         data = JDStructuredData()

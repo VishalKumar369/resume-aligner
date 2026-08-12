@@ -45,6 +45,7 @@ class OptimizeResponse(BaseModel):
     blocked_rewrites: List[Dict[str, str]] = []
 
     used_llm: bool = False
+    from_cache: bool = False
     note: Optional[str] = None
     scoring_note: Optional[str] = None
 

@@ -697,11 +697,38 @@ Verified reproducible: the same stored pair optimized three times gave identical
 
 Test suite: **218 passed** (was 206). Frontend builds clean: 13 routes, `tsc --noEmit` silent.
 
-### Open issue found during Phase 8 verification
-LLM resume extraction sometimes produces **worse** structured data than the heuristic. Two runs
-of the same PDF: one fell back to the heuristic and scored `68.3`; another where the LLM
-extractor succeeded scored `32.0`. Rate-limit fallbacks are also frequent. Worth investigating
-before relying on the LLM extractor — the heuristic may be the better default.
+### LLM budget, caching, and quota handling ✅
+See [backend/docs/llm-budget.md](backend/docs/llm-budget.md).
+
+Investigating the Phase 8 open issue found the real cause:
+
+```
+Quota exceeded for metric: generate_content_free_tier_requests, limit: 20
+quota_id: "GenerateRequestsPerDayPerProjectPerModel-FreeTier"
+```
+
+**20 model calls per day**, not per minute. The app spent 4–6 per analysis across four features,
+so after roughly four runs everything silently fell back — which is why results looked unstable.
+
+**Correction.** The earlier claim that LLM extraction "produces worse data than the heuristic"
+(32.0 vs 68.3) was withdrawn. Only the 68.3 run's extractor was confirmed; the 32.0 run was never
+verified to have used the LLM at all, and the JD parsing differing explains it at least as well.
+That was stated with more confidence than the evidence supported.
+
+| Change | File |
+|---|---|
+| Per-feature LLM switches; rewriting on, extraction/scoring off | `core/config.py` |
+| Quota detection, cooldown, and user-facing reason | `services/ai/factory.py` |
+| Database-backed result cache | `services/ai/cache.py`, `models/llm_cache.py` |
+| JD content-hash dedupe | `jd_routes.py`, `jd_repo.py`, migration `c3a9e5b71f42` |
+| Cache + quota reporting in the optimizer | `optimization/engine.py` |
+
+A full flow now costs **1 call instead of 4–6**, every score is reproducible, cached rewrites are
+re-verified by the fact guard rather than trusted, and quota exhaustion is reported instead of
+silently degrading. Measured: optimize with an exhausted quota takes 1.5s on the first attempt and
+0.1s thereafter (cooldown skips the call).
+
+Test suite: **237 passed** (was 218).
 - JD URL fetching is not implemented; the UI's URL field is unused — deferred.
 - Embeddings/`pgvector` remain unused; `cultural_fit_score` is still unpopulated.
 - No delete endpoints; ownership is still the demo user, so nothing is per-user scoped.

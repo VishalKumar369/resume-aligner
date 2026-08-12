@@ -375,6 +375,19 @@ export default function UploadPage() {
                                     ))}
                                 </div>
 
+                                {optimization.note && (
+                                    <div className="bg-warning/5 border border-warning/20 rounded-xl p-3 flex gap-2.5">
+                                        <AlertTriangle className="w-4 h-4 text-warning flex-shrink-0 mt-0.5" />
+                                        <p className="text-xs text-muted">{optimization.note}</p>
+                                    </div>
+                                )}
+
+                                {optimization.from_cache && (
+                                    <p className="text-[11px] text-muted">
+                                        Reused a previous AI result for these bullets — no quota was spent.
+                                    </p>
+                                )}
+
                                 {optimization.scoring_note && (
                                     <p className="text-[11px] text-muted">{optimization.scoring_note}</p>
                                 )}

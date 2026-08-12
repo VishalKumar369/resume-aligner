@@ -151,7 +151,7 @@ async def optimize_resume(
             detail="This resume has no readable experience or skills to optimize.",
         )
 
-    result = await OptimizationEngine().optimize(
+    result = await OptimizationEngine(db=db).optimize(
         resume_data,
         jd_data,
         resume_text=resume.raw_text or "",
@@ -199,6 +199,7 @@ async def optimize_resume(
         suggestions=result.suggestions,
         blocked_rewrites=result.rejected_rewrites,
         used_llm=result.used_llm,
+        from_cache=result.from_cache,
         note=result.llm_note,
         scoring_note=result.scoring_note,
         download_docx=f"/api/v1/resume/versions/{version.id}/download?format=docx",
