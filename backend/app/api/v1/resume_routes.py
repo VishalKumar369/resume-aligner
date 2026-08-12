@@ -9,6 +9,7 @@ from fastapi import APIRouter, Depends, File, Form, HTTPException, Query, Upload
 from fastapi.responses import FileResponse
 from sqlalchemy.ext.asyncio import AsyncSession
 
+from app.api.deps import get_current_user_id
 from app.db.session import get_db
 from app.models.jd import JobDescription
 from app.models.resume import Resume
@@ -17,7 +18,6 @@ from app.repositories.resume_repo import ResumeRepository
 from app.repositories.version_repo import ResumeVersionRepository
 from app.schemas.resume import ResumeOptimizeRequest, ResumeOut
 from app.schemas.version import OptimizeResponse, ResumeVersionOut
-from app.services.auth.default_user import get_or_create_default_user
 from app.services.documents.writers import render_docx, render_pdf
 from app.services.extraction.types import FileType
 from app.services.optimization.engine import OptimizationEngine
@@ -41,6 +41,7 @@ async def upload_resume(
     file: UploadFile = File(...),
     label: Optional[str] = Form(None),
     db: AsyncSession = Depends(get_db),
+    owner_id: uuid.UUID = Depends(get_current_user_id),
 ):
     file_bytes = await file.read()
 
@@ -52,7 +53,6 @@ async def upload_resume(
             detail=f"File is too large. Maximum size is {MAX_UPLOAD_BYTES // (1024 * 1024)}MB.",
         )
 
-    owner_id = await get_or_create_default_user(db)
     repo = ResumeRepository(Resume, db)
     content_hash = hashlib.sha256(file_bytes).hexdigest()
 
@@ -108,16 +108,23 @@ async def list_resumes(
     skip: int = Query(0, ge=0),
     limit: int = Query(50, ge=1, le=MAX_PAGE_SIZE),
     db: AsyncSession = Depends(get_db),
+    owner_id: uuid.UUID = Depends(get_current_user_id),
 ):
     repo = ResumeRepository(Resume, db)
-    return await repo.get_multi(skip=skip, limit=limit)
+    return await repo.get_by_owner(owner_id, skip=skip, limit=limit)
 
 
 @router.get("/{resume_id}", response_model=ResumeOut)
-async def get_resume(resume_id: uuid.UUID, db: AsyncSession = Depends(get_db)):
+async def get_resume(
+    resume_id: uuid.UUID,
+    db: AsyncSession = Depends(get_db),
+    owner_id: uuid.UUID = Depends(get_current_user_id),
+):
     repo = ResumeRepository(Resume, db)
     resume = await repo.get(resume_id)
-    if not resume:
+    # A resume belonging to someone else is indistinguishable from one that
+    # does not exist, so ownership is never leaked.
+    if not resume or resume.owner_id != owner_id:
         raise HTTPException(status_code=404, detail="Resume not found")
     return resume
 
@@ -126,11 +133,12 @@ async def get_resume(resume_id: uuid.UUID, db: AsyncSession = Depends(get_db)):
 async def optimize_resume(
     payload: ResumeOptimizeRequest,
     db: AsyncSession = Depends(get_db),
+    owner_id: uuid.UUID = Depends(get_current_user_id),
 ):
     """Tailor a resume to one job description and store it as a new version."""
     resume = await db.get(Resume, payload.resume_id)
     jd = await db.get(JobDescription, payload.jd_id)
-    if not resume or not jd:
+    if not resume or not jd or resume.owner_id != owner_id or jd.owner_id != owner_id:
         raise HTTPException(status_code=404, detail="Resume or JD not found")
 
     parser = ResumeParserService()
@@ -192,6 +200,7 @@ async def optimize_resume(
         blocked_rewrites=result.rejected_rewrites,
         used_llm=result.used_llm,
         note=result.llm_note,
+        scoring_note=result.scoring_note,
         download_docx=f"/api/v1/resume/versions/{version.id}/download?format=docx",
         download_pdf=f"/api/v1/resume/versions/{version.id}/download?format=pdf",
     )
@@ -202,10 +211,11 @@ async def download_version(
     version_id: uuid.UUID,
     format: str = Query("docx", pattern="^(docx|pdf)$"),
     db: AsyncSession = Depends(get_db),
+    owner_id: uuid.UUID = Depends(get_current_user_id),
 ):
     repo = ResumeVersionRepository(ResumeVersion, db)
     version = await repo.get(version_id)
-    if not version:
+    if not version or not await repo.is_owned_by(version, owner_id, db):
         raise HTTPException(status_code=404, detail="Resume version not found")
 
     attribute, media_type = DOWNLOAD_FORMATS[format]
@@ -226,7 +236,11 @@ async def list_resume_versions(
     skip: int = Query(0, ge=0),
     limit: int = Query(50, ge=1, le=MAX_PAGE_SIZE),
     db: AsyncSession = Depends(get_db),
+    owner_id: uuid.UUID = Depends(get_current_user_id),
 ):
+    resume = await ResumeRepository(Resume, db).get(resume_id)
+    if not resume or resume.owner_id != owner_id:
+        raise HTTPException(status_code=404, detail="Resume not found")
     repo = ResumeVersionRepository(ResumeVersion, db)
     return await repo.list_for_resume(resume_id, skip=skip, limit=limit)
 

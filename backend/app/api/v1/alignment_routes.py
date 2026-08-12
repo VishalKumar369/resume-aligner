@@ -4,8 +4,11 @@ from typing import Any, Dict, List, Optional
 from fastapi import APIRouter, Depends, HTTPException, Query
 from sqlalchemy.ext.asyncio import AsyncSession
 
+from app.api.deps import get_current_user_id
 from app.db.session import get_db
 from app.models.alignment import AlignmentScore
+from app.models.jd import JobDescription
+from app.models.resume import Resume
 from app.repositories.alignment_repo import AlignmentRepository
 from app.schemas.analytics import (
     AlignmentDetailSchema,
@@ -24,7 +27,9 @@ MAX_PAGE_SIZE = 100
 async def generate_alignment(
     payload: AlignmentRequestSchema,
     db: AsyncSession = Depends(get_db),
+    owner_id: uuid.UUID = Depends(get_current_user_id),
 ):
+    await _assert_owns_pair(db, payload.resume_id, payload.jd_id, owner_id)
     service = AlignmentScorerService()
     result = await service.calculate_alignment(
         resume_id=payload.resume_id, jd_id=payload.jd_id, db=db
@@ -41,10 +46,12 @@ async def list_alignments(
     skip: int = Query(0, ge=0),
     limit: int = Query(50, ge=1, le=MAX_PAGE_SIZE),
     db: AsyncSession = Depends(get_db),
+    owner_id: uuid.UUID = Depends(get_current_user_id),
 ):
     """Stored alignment runs, newest first."""
     repo = AlignmentRepository(AlignmentScore, db)
     rows = await repo.list_alignments(
+        owner_id=owner_id,
         resume_id=resume_id,
         jd_id=jd_id,
         latest_only=latest_only,
@@ -55,13 +62,24 @@ async def list_alignments(
 
 
 @router.get("/{alignment_id}", response_model=AlignmentDetailSchema)
-async def get_alignment(alignment_id: uuid.UUID, db: AsyncSession = Depends(get_db)):
+async def get_alignment(
+    alignment_id: uuid.UUID,
+    db: AsyncSession = Depends(get_db),
+    owner_id: uuid.UUID = Depends(get_current_user_id),
+):
     """A single stored run with its full analysis."""
     repo = AlignmentRepository(AlignmentScore, db)
     row = await repo.get(alignment_id)
-    if not row:
+    if not row or not await repo.is_owned_by(row, owner_id, db):
         raise HTTPException(status_code=404, detail="Alignment not found")
     return _to_detail(row)
+
+
+async def _assert_owns_pair(db, resume_id, jd_id, owner_id) -> None:
+    resume = await db.get(Resume, resume_id)
+    jd = await db.get(JobDescription, jd_id)
+    if not resume or not jd or resume.owner_id != owner_id or jd.owner_id != owner_id:
+        raise HTTPException(status_code=404, detail="Resume or JD not found")
 
 
 def _to_summary(row: AlignmentScore) -> AlignmentSummarySchema:

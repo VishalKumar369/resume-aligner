@@ -65,8 +65,8 @@ class DashboardAnalyticsService:
     async def get_summary(self, db: AsyncSession, user_id: Optional[UUID] = None) -> Dict[str, Any]:
         resumes = await self._resumes(db, user_id)
         jds = await self._jds(db, user_id)
-        alignments = await self._alignments(db)
-        versions = await self._versions(db)
+        alignments = await self._alignments(db, user_id)
+        versions = await self._versions(db, user_id)
 
         latest = self._latest_per_jd(alignments)
         report = self.aggregator.aggregate([run.analysis for run in latest])
@@ -100,9 +100,11 @@ class DashboardAnalyticsService:
             "has_data": bool(latest),
         }
 
-    async def get_gap_report(self, db: AsyncSession) -> GapReport:
+    async def get_gap_report(
+        self, db: AsyncSession, user_id: Optional[UUID] = None
+    ) -> GapReport:
         """Aggregated gaps, shared with the learning roadmap endpoint."""
-        latest = self._latest_per_jd(await self._alignments(db))
+        latest = self._latest_per_jd(await self._alignments(db, user_id))
         return self.aggregator.aggregate([run.analysis for run in latest])
 
     # ------------------------------------------------------------------ queries
@@ -119,17 +121,29 @@ class DashboardAnalyticsService:
             query = query.where(JobDescription.owner_id == user_id)
         return list((await db.execute(query.order_by(JobDescription.created_at.desc()))).scalars().all())
 
-    async def _alignments(self, db: AsyncSession) -> List[AlignmentScore]:
-        query = (
-            select(AlignmentScore)
-            .where(AlignmentScore.is_deleted == False)
-            .order_by(AlignmentScore.created_at.desc())
-        )
+    async def _alignments(
+        self, db: AsyncSession, user_id: Optional[UUID] = None
+    ) -> List[AlignmentScore]:
+        query = select(AlignmentScore).where(AlignmentScore.is_deleted == False)
+        if user_id is not None:
+            query = query.where(AlignmentScore.resume_id.in_(self._owned_resumes(user_id)))
+        query = query.order_by(AlignmentScore.created_at.desc())
         return list((await db.execute(query)).scalars().all())
 
-    async def _versions(self, db: AsyncSession) -> List[ResumeVersion]:
+    async def _versions(
+        self, db: AsyncSession, user_id: Optional[UUID] = None
+    ) -> List[ResumeVersion]:
         query = select(ResumeVersion).where(ResumeVersion.is_deleted == False)
-        return list((await db.execute(query.order_by(ResumeVersion.created_at.desc()))).scalars().all())
+        if user_id is not None:
+            query = query.where(ResumeVersion.resume_id.in_(self._owned_resumes(user_id)))
+        query = query.order_by(ResumeVersion.created_at.desc())
+        return list((await db.execute(query)).scalars().all())
+
+    def _owned_resumes(self, user_id: UUID):
+        """Alignments and versions inherit ownership from their resume."""
+        return select(Resume.id).where(
+            Resume.owner_id == user_id, Resume.is_deleted == False
+        )
 
     # ---------------------------------------------------------------- internals
 

@@ -2,8 +2,10 @@ from typing import List, Optional
 from uuid import UUID
 
 from sqlalchemy import select
+from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.models.alignment import AlignmentScore
+from app.models.resume import Resume
 from app.repositories.base import BaseRepository
 
 
@@ -17,6 +19,7 @@ class AlignmentRepository(BaseRepository[AlignmentScore]):
     async def list_alignments(
         self,
         *,
+        owner_id: Optional[UUID] = None,
         resume_id: Optional[UUID] = None,
         jd_id: Optional[UUID] = None,
         latest_only: bool = False,
@@ -25,6 +28,8 @@ class AlignmentRepository(BaseRepository[AlignmentScore]):
     ) -> List[AlignmentScore]:
         query = select(self.model).where(self.model.is_deleted == False)
 
+        if owner_id is not None:
+            query = query.where(self.model.resume_id.in_(self._owned_resume_ids(owner_id)))
         if resume_id is not None:
             query = query.where(self.model.resume_id == resume_id)
         if jd_id is not None:
@@ -54,6 +59,18 @@ class AlignmentRepository(BaseRepository[AlignmentScore]):
             reverse=True,
         )
         return rows[skip: skip + limit]
+
+    def _owned_resume_ids(self, owner_id: UUID):
+        """Alignments have no owner column; they inherit it from their resume."""
+        return select(Resume.id).where(
+            Resume.owner_id == owner_id, Resume.is_deleted == False
+        )
+
+    async def is_owned_by(
+        self, row: AlignmentScore, owner_id: UUID, db: AsyncSession
+    ) -> bool:
+        resume = await db.get(Resume, row.resume_id)
+        return resume is not None and resume.owner_id == owner_id
 
     async def get_latest_for_pair(
         self, resume_id: UUID, jd_id: UUID

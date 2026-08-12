@@ -101,6 +101,9 @@ class TestDetailMapping:
         assert detail.improvement_suggestions == []
 
 
+OWNER_ID = uuid.uuid4()
+
+
 def _upload(payload: bytes = b"%PDF-1.4 fake", filename: str = "resume.pdf") -> UploadFile:
     return UploadFile(
         file=BytesIO(payload),
@@ -122,13 +125,6 @@ class TestUploadDedupe:
             structured_data={"schema_version": "1.0"},
             extraction_meta={"method": "pdf_text"},
         )
-
-    @pytest.fixture(autouse=True)
-    def stub_owner(self, monkeypatch):
-        async def _owner(_db):
-            return uuid.uuid4()
-
-        monkeypatch.setattr(resume_routes, "get_or_create_default_user", _owner)
 
     def _stub_repo(self, monkeypatch, found):
         seen = {}
@@ -153,7 +149,7 @@ class TestUploadDedupe:
     ):
         self._stub_repo(monkeypatch, found=existing_resume)
 
-        result = await resume_routes.upload_resume(file=_upload(), label=None, db=None)
+        result = await resume_routes.upload_resume(file=_upload(), label=None, db=None, owner_id=OWNER_ID)
 
         assert result.id == existing_resume.id
         assert result.duplicate_of_existing is True
@@ -169,7 +165,7 @@ class TestUploadDedupe:
         monkeypatch.setattr(resume_routes.ResumeParserService, "extract", _explode)
         monkeypatch.setattr(resume_routes, "get_storage", _explode)
 
-        result = await resume_routes.upload_resume(file=_upload(), label=None, db=None)
+        result = await resume_routes.upload_resume(file=_upload(), label=None, db=None, owner_id=OWNER_ID)
         assert result.duplicate_of_existing is True
 
     @pytest.mark.asyncio
@@ -179,7 +175,7 @@ class TestUploadDedupe:
         payload = b"%PDF-1.4 specific bytes"
         seen = self._stub_repo(monkeypatch, found=existing_resume)
 
-        await resume_routes.upload_resume(file=_upload(payload), label=None, db=None)
+        await resume_routes.upload_resume(file=_upload(payload), label=None, db=None, owner_id=OWNER_ID)
 
         assert seen["content_hash"] == hashlib.sha256(payload).hexdigest()
 
@@ -188,6 +184,6 @@ class TestUploadDedupe:
         self._stub_repo(monkeypatch, found=None)
 
         with pytest.raises(Exception) as caught:
-            await resume_routes.upload_resume(file=_upload(b""), label=None, db=None)
+            await resume_routes.upload_resume(file=_upload(b""), label=None, db=None, owner_id=OWNER_ID)
 
         assert getattr(caught.value, "status_code", None) == 400

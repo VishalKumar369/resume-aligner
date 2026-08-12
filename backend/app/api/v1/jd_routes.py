@@ -4,11 +4,11 @@ from typing import List, Optional
 from fastapi import APIRouter, Depends, HTTPException, Query
 from sqlalchemy.ext.asyncio import AsyncSession
 
+from app.api.deps import get_current_user_id
 from app.db.session import get_db
 from app.models.jd import JobDescription
 from app.repositories.jd_repo import JDRepository
 from app.schemas.jd import JDOut, JDUploadSchema
-from app.services.auth.default_user import get_or_create_default_user
 from app.services.parsing.jd_parser import JDParserService
 
 router = APIRouter()
@@ -23,6 +23,7 @@ MAX_PAGE_SIZE = 100
 async def upload_jd(
     jd_in: JDUploadSchema,
     db: AsyncSession = Depends(get_db),
+    owner_id: uuid.UUID = Depends(get_current_user_id),
 ):
     raw_text = (jd_in.raw_text or "").strip()
     if not raw_text:
@@ -31,7 +32,6 @@ async def upload_jd(
             detail="Job description text is required. Paste the posting to continue.",
         )
 
-    owner_id = await get_or_create_default_user(db)
     structured_data = await JDParserService().parse(raw_text)
 
     repo = JDRepository(JobDescription, db)
@@ -52,16 +52,21 @@ async def list_jds(
     skip: int = Query(0, ge=0),
     limit: int = Query(50, ge=1, le=MAX_PAGE_SIZE),
     db: AsyncSession = Depends(get_db),
+    owner_id: uuid.UUID = Depends(get_current_user_id),
 ):
     repo = JDRepository(JobDescription, db)
-    return await repo.get_multi(skip=skip, limit=limit)
+    return await repo.get_by_owner(owner_id, skip=skip, limit=limit)
 
 
 @router.get("/{jd_id}", response_model=JDOut)
-async def get_jd(jd_id: uuid.UUID, db: AsyncSession = Depends(get_db)):
+async def get_jd(
+    jd_id: uuid.UUID,
+    db: AsyncSession = Depends(get_db),
+    owner_id: uuid.UUID = Depends(get_current_user_id),
+):
     repo = JDRepository(JobDescription, db)
     jd = await repo.get(jd_id)
-    if not jd:
+    if not jd or jd.owner_id != owner_id:
         raise HTTPException(status_code=404, detail="Job description not found")
     return jd
 

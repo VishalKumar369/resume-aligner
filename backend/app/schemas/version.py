@@ -46,6 +46,7 @@ class OptimizeResponse(BaseModel):
 
     used_llm: bool = False
     note: Optional[str] = None
+    scoring_note: Optional[str] = None
 
     download_docx: str
     download_pdf: str

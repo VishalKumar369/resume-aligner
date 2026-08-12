@@ -30,13 +30,13 @@ class CompanyInsightsService:
         self.aggregator = aggregator or SkillGapAggregator()
 
     async def get_insights(
-        self, db: AsyncSession, company_id: str
+        self, db: AsyncSession, company_id: str, owner_id: Optional[UUID] = None
     ) -> Optional[Dict[str, Any]]:
         """Insights for a company, or None if the user has saved no JDs for it.
 
         `company_id` may be the stored company name or its slug.
         """
-        jds = await self._matching_jds(db, company_id)
+        jds = await self._matching_jds(db, company_id, owner_id)
         if not jds:
             return None
 
@@ -83,11 +83,14 @@ class CompanyInsightsService:
 
     # ---------------------------------------------------------------- internals
 
-    async def _matching_jds(self, db: AsyncSession, company_id: str) -> List[JobDescription]:
+    async def _matching_jds(
+        self, db: AsyncSession, company_id: str, owner_id: Optional[UUID] = None
+    ) -> List[JobDescription]:
+        query = select(JobDescription).where(JobDescription.is_deleted == False)
+        if owner_id is not None:
+            query = query.where(JobDescription.owner_id == owner_id)
         rows = (await db.execute(
-            select(JobDescription)
-            .where(JobDescription.is_deleted == False)
-            .order_by(JobDescription.created_at.desc())
+            query.order_by(JobDescription.created_at.desc())
         )).scalars().all()
 
         target = slugify(company_id)

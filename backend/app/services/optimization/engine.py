@@ -40,6 +40,12 @@ class OptimizationResult:
 
     used_llm: bool = False
     llm_note: Optional[str] = None
+    # Explains why these figures can differ from the headline alignment score.
+    scoring_note: str = (
+        "Before and after are both scored deterministically so the change is a "
+        "like-for-like comparison. The alignment score shown elsewhere may use "
+        "an additional model-based component and can differ slightly."
+    )
 
     @property
     def ats_delta(self) -> float:
@@ -70,6 +76,11 @@ class OptimizationEngine:
         self.advisor = advisor or BulletAdvisor()
         self.rewriter = rewriter or LLMBulletRewriter()
         self.ats_scorer = ats_scorer or ATSScorerService()
+        # Scoring here is always deterministic, even when bullet rewriting uses a
+        # model. The before/after pair only means something if both sides are
+        # measured the same way, and an LLM-derived component varies between
+        # calls - especially under free-tier rate limits, where one side can fall
+        # back mid-run and silently shift the delta.
         self.alignment_scorer = alignment_scorer or AlignmentScorerService(use_llm=False)
         self._use_llm = use_llm
 
