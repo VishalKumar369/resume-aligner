@@ -8,13 +8,19 @@ from app.services.alignment.scorer import AlignmentScorerService
 SAMPLE_RESUME_TEXT = """
 John Doe
 Senior Backend Engineer
+john.doe@example.com | +1 415 555 0132
 
-Experience
+WORK EXPERIENCE
+Acme Tech Bengaluru, Karnataka
+Senior Backend Engineer January 2021 - Present
 - Built event-driven APIs with Python and FastAPI
 - Led migration to PostgreSQL and Docker
 - Delivered Kubernetes-based deployment pipelines
 
-Skills: Python, FastAPI, PostgreSQL, Docker, Kubernetes
+SKILLS
+Languages: Python, SQL
+Frameworks: FastAPI
+Infrastructure: PostgreSQL, Docker, Kubernetes
 """
 
 SAMPLE_JD_TEXT = """
@@ -50,10 +56,13 @@ async def test_resume_parser_extracts_core_resume_structure():
     parsed = await service.parse(SAMPLE_RESUME_TEXT)
 
     assert _get_nested(parsed, "personal_info", "name") == "John Doe"
+    assert _get_nested(parsed, "personal_info", "email") == "john.doe@example.com"
     hard_skills = _get_nested(parsed, "skills", "hard_skills") or []
     assert "Python" in hard_skills
     assert "FastAPI" in hard_skills
     assert _get_nested(parsed, "experience", 0, "role") == "Senior Backend Engineer"
+    assert _get_nested(parsed, "experience", 0, "company") == "Acme Tech"
+    assert _get_nested(parsed, "total_experience_years") > 0
 
 
 @pytest.mark.asyncio
@@ -64,10 +73,11 @@ async def test_jd_parser_extracts_requirements_and_experience_level():
     assert _get_nested(parsed, "role") == "Backend Engineer"
     assert _get_nested(parsed, "company") == "Acme Tech"
 
-    mandatory = _get_nested(parsed, "requirements", "mandatory") or []
+    mandatory = _get_nested(parsed, "requirements", "mandatory_skills") or []
     assert "Python" in mandatory
     assert "Kubernetes" in mandatory
-    assert _get_nested(parsed, "experience_level") == "Senior (5+ years)"
+    assert _get_nested(parsed, "seniority") == "senior"
+    assert _get_nested(parsed, "min_experience_years") == 5
 
 
 @pytest.mark.asyncio

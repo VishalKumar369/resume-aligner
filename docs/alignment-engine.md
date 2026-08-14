@@ -1,5 +1,15 @@
 # Alignment Engine
 
+> **Status: implemented, with deviations.**
+> Built as [backend/docs/scoring-engine.md](../backend/docs/scoring-engine.md).
+>
+> Deviations: **no embeddings or cosine similarity** — `pgvector` is unused and semantic matching
+> is approximated by a canonical skill vocabulary plus content-word overlap. Tool match is folded
+> into skill match (no separate data source), giving skills .40, responsibilities .20, projects
+> .20, seniority .20. A component with no data is dropped and the remaining weights renormalise,
+> so a missing input is never scored as a zero.
+
+
 ## Overview
 The Alignment Engine calculates the semantic and structural "fit" between a specific Resume and a Job Description.
 

@@ -1,6 +1,6 @@
 # Backend Analysis & Redesign Plan
 
-> Status: **Phase 0 and Phase 1 complete.** Phases 2–9 pending.
+> Status: **All nine phases complete.** See [README.md](README.md) for the documentation index.
 > Date: 2026-08-09
 > Scope: the 5-step analysis flow (Upload Resume → Add JD → Review Alignment → Optimize Resume → View Analytics)
 >
@@ -27,7 +27,7 @@ A redesign of the parsing layer is required, not a patch.
 
 ### 2.1 The failure path
 
-Trace of a real PDF upload through [resume_routes.py:24-42](backend/app/api/v1/resume_routes.py#L24-L42):
+Trace of a real PDF upload through [resume_routes.py:24-42](../backend/app/api/v1/resume_routes.py#L24-L42):
 
 ```
 file bytes  →  storage.upload_file()            ✅ file saved to uploads/
@@ -36,7 +36,7 @@ file bytes  →  storage.upload_file()            ✅ file saved to uploads/
             →  repo.create(raw_text=..., structured_data=...)   ❌ garbage persisted
 ```
 
-In [resume_parser.py:36-63](backend/app/services/parsing/resume_parser.py#L36-L63), `_looks_like_binary()` checks for the `%PDF` magic bytes and the ZIP header `PK\x03\x04` (which is what a `.docx` is). On a match, `_decode_text()` returns:
+In [resume_parser.py:36-63](../backend/app/services/parsing/resume_parser.py#L36-L63), `_looks_like_binary()` checks for the `%PDF` magic bytes and the ZIP header `PK\x03\x04` (which is what a `.docx` is). On a match, `_decode_text()` returns:
 
 ```
 "[Binary or non-text content stored as file reference only for Vishal_Kumar_Resume.pdf]"
@@ -65,7 +65,7 @@ Because `experience_years = 0` and `hard_skills = []`, the alignment scorer then
 - **No PDF library installed.** `requirements.txt` contains no `pypdf`, `PyMuPDF`, `pdfplumber`, or `pdfminer.six`.
 - **No DOCX library installed.** No `python-docx`.
 - **No OCR.** No `pytesseract` / `pdf2image` / Pillow OCR path, despite the intended pipeline calling for an OCR fallback on empty text.
-- **No LLM extraction wired.** `AIFactory` exists in [factory.py](backend/app/services/ai/factory.py) but **neither `ResumeParserService` nor `JDParserService` ever calls it.**
+- **No LLM extraction wired.** `AIFactory` exists in [factory.py](../backend/app/services/ai/factory.py) but **neither `ResumeParserService` nor `JDParserService` ever calls it.**
 - **No API keys configured.** `.env` has `OPENAI_API_KEY="sk-..."` (placeholder, 8 chars), `GROQ_API_KEY=""`, `GEMINI_API_KEY=""`. Any LLM call today would fail with an auth error.
 - **PostgreSQL is running** and reachable on `localhost:5432`.
 - **8 real PDFs already sit in `backend/uploads/`** (3 distinct files, uploaded repeatedly — no dedupe).
@@ -74,7 +74,7 @@ Because `experience_years = 0` and `hard_skills = []`, the alignment scorer then
 
 Even with correct text, the current parser cannot produce reliable structure:
 
-- **Skills** are matched against a hardcoded 24-item list ([resume_parser.py:6-11](backend/app/services/parsing/resume_parser.py#L6-L11)). Anything outside that list is invisible.
+- **Skills** are matched against a hardcoded 24-item list ([resume_parser.py:6-11](../backend/app/services/parsing/resume_parser.py#L6-L11)). Anything outside that list is invisible.
 - **Soft skills** are a fixed constant returned for every resume.
 - **Name** is "the first non-empty line" — wrong for any resume that leads with a header, logo caption, or contact block.
 - **Experience** matches any line containing `engineer|developer|manager|lead|analyst|architect` and caps at 3 entries, with `company` always `""` and `highlights` always `[]`.
@@ -91,13 +91,13 @@ These break the flow independently of parsing.
 
 ### 3.1 `POST /alignment/generate` — Step 3 is broken
 
-[alignment_routes.py:12-16](backend/app/api/v1/alignment_routes.py#L12-L16) declares:
+[alignment_routes.py:12-16](../backend/app/api/v1/alignment_routes.py#L12-L16) declares:
 
 ```python
 async def generate_alignment(resume_id: uuid.UUID, jd_id: uuid.UUID, db=Depends(get_db)):
 ```
 
-Bare scalar parameters in FastAPI bind as **query parameters**. The frontend sends a JSON body ([api.ts:60-61](frontend/services/api.ts#L60-L61)):
+Bare scalar parameters in FastAPI bind as **query parameters**. The frontend sends a JSON body ([api.ts:60-61](../frontend/services/api.ts#L60-L61)):
 
 ```ts
 api.post("/alignment/generate", { resume_id: resumeId, jd_id: jdId })
@@ -107,7 +107,7 @@ Result: **HTTP 422**, and the UI shows "Alignment failed". Step 3 can never succ
 
 ### 3.2 `POST /resume/optimize` — same issue, and it is a stub
 
-Same query-vs-body mismatch, and the handler returns a hardcoded response ([resume_routes.py:51-64](backend/app/api/v1/resume_routes.py#L51-L64)) with a fake filename and fake change list. No optimization engine exists.
+Same query-vs-body mismatch, and the handler returns a hardcoded response ([resume_routes.py:51-64](../backend/app/api/v1/resume_routes.py#L51-L64)) with a fake filename and fake change list. No optimization engine exists.
 
 ### 3.3 `POST /resume/upload` — `label` silently dropped
 
@@ -115,7 +115,7 @@ Same query-vs-body mismatch, and the handler returns a hardcoded response ([resu
 
 ### 3.4 Steps 4 and 5 never call the backend
 
-- **Step 4 (Optimize)** in [upload/page.tsx:87-90](frontend/app/upload/page.tsx#L87-L90) just does `setCurrentStep(5)`. The "ATS Score went from 74% → 92%" text is hardcoded.
+- **Step 4 (Optimize)** in [upload/page.tsx:87-90](../frontend/app/upload/page.tsx#L87-L90) just does `setCurrentStep(5)`. The "ATS Score went from 74% → 92%" text is hardcoded.
 - **Step 5 (Analytics)** renders values from the step-3 response only; it never calls `/dashboard/summary`.
 
 ### 3.5 No read-back endpoints
@@ -126,12 +126,12 @@ There is no `GET /resume/{id}`, `GET /jd/{id}`, or `GET /alignment/{id}`. The fr
 
 ## 4. Scoring engine defects
 
-In [scorer.py](backend/app/services/alignment/scorer.py):
+In [scorer.py](../backend/app/services/alignment/scorer.py):
 
 1. **Dead code.** Everything after the `else` block's `return` (the trailing ~25 lines) is unreachable and duplicates the live logic.
 2. **Exact-string skill matching.** `resume_skills ∩ jd_skills` on capitalized tokens. No normalization, no aliasing — `"Node"` ≠ `"Node.js"`, `"K8s"` ≠ `"Kubernetes"`, `"Postgres"` ≠ `"PostgreSQL"`. Match rates are artificially low.
 3. **Fabricated ATS score.** `ats_score = min(100, alignment_score + 3)`. It is not an ATS evaluation at all.
-4. **`ATSScorerService` is orphaned.** The LLM-based ATS scorer in [ats_scorer.py](backend/app/services/ats/ats_scorer.py) is never called by any route.
+4. **`ATSScorerService` is orphaned.** The LLM-based ATS scorer in [ats_scorer.py](../backend/app/services/ats/ats_scorer.py) is never called by any route.
 5. **`cultural_fit_score`** column exists in the model and is never populated.
 6. **Empty-input case** returns `alignment_score = 0` with no diagnostic explaining that extraction failed — indistinguishable from a genuinely bad match. This is exactly what the user is seeing.
 7. **No semantic similarity.** `embeddings-pipeline.md` and `pgvector` in `requirements.txt` describe a vector path; `app/services/resume/embedding.py` is not used by the alignment flow.
@@ -424,7 +424,7 @@ Small, independently testable increments. Each phase ends green before the next 
 | Fixed the 2 failing tests and a list-indexing bug in the test helper | `tests/test_analysis_workflow.py` |
 
 ### Phase 1 — document text extraction ✅
-New package `app/services/extraction/` — see [backend/docs/extraction-pipeline.md](backend/docs/extraction-pipeline.md).
+New package `app/services/extraction/` — see [backend/docs/extraction-pipeline.md](../backend/docs/extraction-pipeline.md).
 
 - Magic-byte file type detection (does not trust filename or `Content-Type`)
 - PDF via pdfplumber with a pypdf fallback; DOCX via python-docx incl. tables and headers
@@ -450,12 +450,290 @@ missing `["backend", "kubernetes"]`, with `extraction_health: {resume_ok: true, 
 
 Test suite: **23 passed**.
 
-### Still broken after Phase 1 (by design — Phase 2 scope)
-- `experience_years` still returns `0`; the heuristic never parses date ranges.
-- `soft_skills` is still the hardcoded constant.
-- `education`, `projects`, and `certifications` still return search terms rather than real entities.
-- `experience` entries still have empty `company` and `highlights`.
-- Steps 4 and 5 are still not wired.
+### Phase 2 — structured resume extraction ✅
+New contract and extractors — see [backend/docs/structured-extraction.md](../backend/docs/structured-extraction.md).
+
+| Component | File |
+|---|---|
+| Validated contract, `schema_version` | `app/schemas/structured.py` |
+| Section segmenter | `parsing/sections.py` |
+| Date-range parsing + overlap merging | `parsing/date_utils.py` |
+| Wrapped-line rejoining, bracket-safe splitting | `parsing/line_utils.py` |
+| Deterministic extractor | `parsing/heuristic_resume_extractor.py` |
+| LLM extractor (dormant until a key is set) | `parsing/llm_resume_extractor.py` |
+| Selection + guaranteed fallback | `parsing/extractor_selector.py` |
+| Soft-skill vocabulary; `js` alias no longer fires inside `Express.js` | `parsing/skill_vocabulary.py` |
+| Scorer reads `total_experience_years`, matches on canonical skills | `alignment/scorer.py` |
+
+**Before → after on the same real PDF:**
+
+| Field | Phase 1 | Phase 2 |
+|---|---|---|
+| `total_experience_years` | `0` | `1.9` (merged date ranges) |
+| `experience[].company` | `""` | `The Math Company (MathCo)`, `DataAstraa` |
+| `experience[].dates` | absent | `2025-02 → present` (19mo), `2024-05 → 2024-08` (4mo) |
+| `experience[].highlights` | `[]` | all bullets, unwrapped |
+| `education` | `["bachelor", "university"]` | `B.Tech in Computer Science` @ `Indian Institute of Information Technology, Dharwad` (2021–2025) |
+| `soft_skills` | hardcoded 3 for everyone | detected only when mentioned |
+| `skills.categories` | absent | 6 real categories from the resume |
+| `projects` | 3 arbitrary lines | 3 real projects with tech stacks |
+
+**Effect on alignment** (same resume + JD, before vs after):
+
+```
+experience_match_score:   0.00  ->  95.00     (real experience total)
+skill_match_score:       60.00  ->  66.67     ("React" now matches "React.js")
+alignment_score:         42.00  ->  75.17
+```
+
+Test suite: **62 passed** (was 23).
+
+### Phase 3 — JD parsing parity ✅
+JD side brought up to the same standard — see [backend/docs/jd-extraction.md](../backend/docs/jd-extraction.md).
+
+| Component | File |
+|---|---|
+| Validated JD contract, `schema_version` | `app/schemas/jd_structured.py` |
+| Generic section splitting, shared with resumes | `parsing/section_utils.py` |
+| JD section segmenter | `parsing/jd_sections.py` |
+| Deterministic extractor | `parsing/heuristic_jd_extractor.py` |
+| LLM extractor (dormant until a key is set) | `parsing/llm_jd_extractor.py` |
+| Selection + guaranteed fallback | `parsing/jd_extractor_selector.py` |
+| Placeholder title/company replaced by parsed values; empty JD now `422`; `GET /jd/{id}`, `GET /jd/list` | `api/v1/jd_routes.py` |
+| Scorer matches `normalized_mandatory`, reads `min_experience_years` | `alignment/scorer.py` |
+
+**Before → after on the same posting:**
+
+| Field | Phase 2 | Phase 3 |
+|---|---|---|
+| `company` | `""` | `Acme Technologies` |
+| `preferred` | `["nice to have"]` (the cue phrase) | `["Kubernetes", "Terraform", "Kafka"]` |
+| `mandatory` | 8 skills, mixing must-haves with nice-to-haves | 5 genuine must-haves |
+| `"Backend"` from the job title | counted as a required skill | never read from the title |
+| `responsibilities` | the whole JD as one blob | 2 real bullets |
+| `location` / `work_mode` / `employment_type` | absent | `Bengaluru, India` / `hybrid` / `Full-Time` |
+| `seniority` / experience | `"Senior (5+ years)"` string | `seniority: senior`, `min_experience_years: 5` |
+| stored JD title | `"Target Role"` for every row | parsed role |
+
+Two latent bugs were found and fixed along the way:
+- Section aliases were not normalised the way header lines were, so `What we're looking for`
+  and the resume's `extra-curricular` could never match.
+- The resume writes "backends" (plural) while the JD writes "backend", producing a phantom
+  missing skill. Plural aliases are now explicit (a blanket trailing `s` would have made
+  "reacts" match React).
+
+Test suite: **90 passed** (was 62).
+
+### Phase 4 — alignment & ATS scoring redesign ✅
+Scoring now uses the data Phases 2–3 extract — see [backend/docs/scoring-engine.md](../backend/docs/scoring-engine.md).
+
+| Component | File |
+|---|---|
+| Weighted skill matching, partial credit, P1/P2/P3 gaps | `alignment/skill_matcher.py` |
+| Responsibility overlap, project relevance, seniority | `alignment/components.py` |
+| Deterministic 5-component ATS score | `ats/ats_engine.py` |
+| ATS entry point + optional LLM feedback | `ats/ats_scorer.py` |
+| Optional LLM layer (responsibility + prose only) | `alignment/llm_enhancer.py` |
+| Component combination with renormalisation | `alignment/scorer.py` |
+| Full breakdown persisted for later features | `alignment/persistence.py` |
+| Skill categories for partial credit | `parsing/skill_vocabulary.py` |
+
+**What changed:**
+
+| | Before | After |
+|---|---|---|
+| `ats_score` | literally `min(100, alignment + 3)` | 5 real components per `docs/ats-scoring-engine.md` |
+| `ATSScorerService` | existed, called from nowhere | wired, deterministic, LLM optional |
+| Alignment components | skills .70, experience .30 | skills .40, responsibilities .20, projects .20, seniority .20 |
+| Missing input | scored as zero | component dropped, weights renormalise |
+| Skill weighting | all equal | title/frequency weighted |
+| `preferred_skills` | parsed, unused | bonus that adds but never subtracts |
+| Docker vs Kubernetes | scored zero | 0.4 partial credit, reported as `partial_skills` |
+| Gaps | flat lowercase list | display names, ranked P1/P2/P3 |
+| `responsibilities`, `projects[].tech_stack` | parsed, unused | scored components |
+
+**Discrimination** — same resume, two postings:
+
+```
+                        relevant backend role    principal SRE role
+alignment_score                        72.31                 10.97
+skill_match                            90.77                 10.00
+responsibility_match                  100.00                 15.87
+seniority_match                        63.33                 19.00
+```
+
+The LLM layer can only set `responsibility_match` and rewrite prose; it can never move
+`skill_match`, `project_match`, `seniority_match`, or any ATS number, so the headline figures
+stay reproducible whether or not a key is configured.
+
+Test suite: **126 passed** (was 90).
+
+### Phase 5 — persistence & read-back ✅
+See [backend/docs/persistence-and-readback.md](../backend/docs/persistence-and-readback.md).
+
+| Component | File |
+|---|---|
+| Alignment history queries, `latest_only`, pagination | `repositories/alignment_repo.py` |
+| Content-hash lookup for idempotent upload | `repositories/resume_repo.py` |
+| `AlignmentSummarySchema` / `AlignmentDetailSchema`; `alignment_id` on generate | `schemas/analytics.py` |
+| `GET /alignment/list`, `GET /alignment/{id}` | `api/v1/alignment_routes.py` |
+| Dedupe on upload + `duplicate_of_existing` flag; pagination | `api/v1/resume_routes.py` |
+| Stale-payload tolerance (`entries()`) | `schemas/structured.py` |
+
+- **Dedupe** keys on the SHA-256 of the file bytes. Re-uploading returns the existing record with
+  no second file and no re-parse. `uploads/` had 14 PDFs for 2 distinct resumes; existing files
+  were left in place by decision.
+- **History** is appended on every generate, so score movement over time is recoverable.
+  `latest_only=true` collapses to the newest run per pair via Postgres `DISTINCT ON`.
+- **List returns scores only**; the full breakdown comes from the detail endpoint.
+- `alignment_id` is now returned by `/alignment/generate`, as `api-design.md` always specified.
+
+**A real bug surfaced here.** Dedupe returned a resume row stored before Phase 2, whose
+`structured_data` kept `experience` as a list of strings. The Phase 4 scorer expects objects and
+crashed with `AttributeError: 'str' object has no attribute 'get'`. `schema_version` existed for
+exactly this but nothing checked it on read. Fixed on both levels: the scorer now re-parses any
+payload that is not the current schema, and readers go through `entries()`, which skips
+non-mapping list items. Regression tests added.
+
+Test suite: **141 passed** (was 126).
+
+### Phase 6 — resume optimizer (Step 4) ✅
+See [backend/docs/optimization-engine.md](../backend/docs/optimization-engine.md).
+
+| Component | File |
+|---|---|
+| Anti-fabrication guardrail | `optimization/fact_guard.py` |
+| Evidenced-skill promotion | `optimization/skill_promoter.py` |
+| JD-relevance reordering | `optimization/reorderer.py` |
+| Per-bullet advice | `optimization/bullet_advisor.py` |
+| LLM rewriting behind the guard | `optimization/llm_bullet_rewriter.py` |
+| Orchestration, change log, before/after | `optimization/engine.py` |
+| Shared layout + text/.docx/PDF writers | `documents/layout.py`, `documents/writers.py` |
+| Version history + downloads | `repositories/version_repo.py`, `api/v1/resume_routes.py` |
+| Extra version columns | migration `b7d2f1a4c803` (applied) |
+
+`POST /resume/optimize` was a `501`; it now returns a stored version with both download formats.
+Added `GET /resume/{id}/versions` and `GET /resume/versions/{id}/download?format=docx|pdf`.
+
+**Nothing is invented, and that is enforced mechanically:** skills are promoted only when already
+evidenced in the resume, and every LLM rewrite is diffed against its original and discarded if it
+introduces a figure, technology, or name that was not there. Verified against the live model —
+it blocked rewrites adding "microservices" and "backend".
+
+Measured on a weak resume: `ATS 52.0 → 85.0`, `Alignment 37.5 → 75.0`. On an already-strong
+resume the delta is `0.0`, which is correct: with skill match, responsibility match, and keyword
+coverage already at 100, the only remaining gaps are project relevance and years of experience,
+neither closable honestly.
+
+**Two prerequisites had to be fixed first.** `google-generativeai` was pinned at `0.4.1`, which
+predates Gemini 1.5 GA and cannot route current models (now `0.8.6`). And `GeminiProvider` mapped
+every non-`user` role to `"model"`, so the system prompts written in Phases 2–4 were replayed as
+model turns — the model saw its own instructions as something it had already said. Both fixed and
+live-verified. Note that `gemini-2.0-flash` has **zero** free-tier quota
+(`limit: 0`) and `gemini-1.5-flash` is retired; the default is now `gemini-2.5-flash`.
+
+Test suite: **179 passed** (was 141).
+
+### Phase 7 — analytics, learning roadmap, company insights (Step 5) ✅
+See [backend/docs/analytics-and-learning.md](../backend/docs/analytics-and-learning.md).
+
+| Component | File |
+|---|---|
+| Commonality gap across all target JDs | `skill_gap/aggregator.py` |
+| Single-pair gaps via the Phase 4 matcher | `skill_gap/detector.py` |
+| Dashboard aggregation | `dashboard/analytics.py` |
+| Curated official-docs library, categories, prerequisites | `learning/resources.py` |
+| Clustering, dependency ordering, scheduling | `learning/roadmap_generator.py` |
+| Company view from the user's own JDs | `company/insights.py` |
+
+**What these endpoints used to return:** `/dashboard/summary` served a fixed
+`total_resumes: 5` / `avg_alignment_score: 78.4` with activity dated 2024 and a
+`dummy_user_id = uuid.uuid4()` generated per request. `/learning/roadmap` returned
+`"Mastering {skill}"` for a hardcoded skill list, linking to `https://coursera.org/...` for a
+course that does not exist. `/company/{id}/insights` asserted a tech stack, culture, and
+interview tips for any company id — fabricating claims about real organisations.
+
+Gaps now rank by `jd_count × priority_weight`, so the skill three roles demand outranks a single
+P1 — the commonality gap from `skill-gap-engine.md`. Only the newest run per JD counts, so
+re-scoring one role cannot dominate the averages.
+
+**Two places where the spec asked for something that does not exist:**
+- `dashboard-analytics.md` specifies interview probability from "a logistic regression model
+  trained on historical hiring data". There is no such model or data, so the endpoint returns a
+  transparent band that ships its own `basis` and `caveat` rather than implying a trained
+  prediction.
+- The roadmap's resources are each skill's genuine official documentation. A skill with no
+  library entry returns **no** resource rather than a plausible-looking guess.
+
+Live-verified against real data: readiness `69.74`, gaps `Terraform (P2, 5 JDs)` and
+`Kafka (P3, 5 JDs)`, a 2-module 3-week roadmap ordered by priority, and per-company matches with
+`roles_tracked`.
+
+Test suite: **206 passed** (was 179).
+
+### Phase 8 — frontend integration + real per-user ownership ✅
+See [frontend/docs/frontend-integration.md](../frontend/docs/frontend-integration.md).
+
+**Auth was decorative.** Login returned a valid JWT and every data route then ignored it, serving
+a shared demo user — two accounts saw each other's resumes. `app/api/deps.py` adds
+`get_current_user`, and every route and analytics service is now scoped to the token's owner.
+Alignments and versions have no owner column, so they are constrained through their resume.
+Verified: `401` without a token, `404` on every cross-account read, `0` rows for a second account.
+
+**Every page now reads real data** — dashboard, skills, readiness, resume-versions, learning,
+company, and all five upload steps. Each handles loading, error, and a `has_data`-driven empty
+state.
+
+**Step 1 shows what was extracted** — parsed name, contact, skills by category, experience with
+dates, confidence, and warnings, with a Replace file action. This is the direct answer to the
+original complaint; a bad parse is now visible before three more steps run on it.
+
+**A scoring inconsistency was found and fixed during verification.** Step 3 reported alignment
+`58.0` while step 4 called its baseline `68.3` for the same pair. The optimizer makes three model
+calls in quick succession, and under free-tier rate limits one side fell back mid-run, shifting
+the delta. The optimizer now scores before/after deterministically so the comparison is
+like-for-like, and returns a `scoring_note` explaining why it can differ from the headline score.
+Verified reproducible: the same stored pair optimized three times gave identical numbers.
+
+Test suite: **218 passed** (was 206). Frontend builds clean: 13 routes, `tsc --noEmit` silent.
+
+### LLM budget, caching, and quota handling ✅
+See [backend/docs/llm-budget.md](../backend/docs/llm-budget.md).
+
+Investigating the Phase 8 open issue found the real cause:
+
+```
+Quota exceeded for metric: generate_content_free_tier_requests, limit: 20
+quota_id: "GenerateRequestsPerDayPerProjectPerModel-FreeTier"
+```
+
+**20 model calls per day**, not per minute. The app spent 4–6 per analysis across four features,
+so after roughly four runs everything silently fell back — which is why results looked unstable.
+
+**Correction.** The earlier claim that LLM extraction "produces worse data than the heuristic"
+(32.0 vs 68.3) was withdrawn. Only the 68.3 run's extractor was confirmed; the 32.0 run was never
+verified to have used the LLM at all, and the JD parsing differing explains it at least as well.
+That was stated with more confidence than the evidence supported.
+
+| Change | File |
+|---|---|
+| Per-feature LLM switches; rewriting on, extraction/scoring off | `core/config.py` |
+| Quota detection, cooldown, and user-facing reason | `services/ai/factory.py` |
+| Database-backed result cache | `services/ai/cache.py`, `models/llm_cache.py` |
+| JD content-hash dedupe | `jd_routes.py`, `jd_repo.py`, migration `c3a9e5b71f42` |
+| Cache + quota reporting in the optimizer | `optimization/engine.py` |
+
+A full flow now costs **1 call instead of 4–6**, every score is reproducible, cached rewrites are
+re-verified by the fact guard rather than trusted, and quota exhaustion is reported instead of
+silently degrading. Measured: optimize with an exhausted quota takes 1.5s on the first attempt and
+0.1s thereafter (cooldown skips the call).
+
+Test suite: **237 passed** (was 218).
+- JD URL fetching is not implemented; the UI's URL field is unused — deferred.
+- Embeddings/`pgvector` remain unused; `cultural_fit_score` is still unpopulated.
+- No delete endpoints; ownership is still the demo user, so nothing is per-user scoped.
+- `SkillGap`, `LearningPath`, and `DashboardSnapshot` tables remain unused.
+- `google-generativeai` is the deprecated SDK line; migrating to `google-genai` is a future task.
 
 ---
 

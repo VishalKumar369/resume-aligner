@@ -1,5 +1,16 @@
 # Resume Optimizer
 
+> **Status: implemented.**
+> Built as [backend/docs/optimization-engine.md](../backend/docs/optimization-engine.md).
+>
+> "DO NOT fabricate experience" is enforced **mechanically**, not by prompting: every rewrite is
+> diffed against its original and discarded if it introduces a figure, technology, or name that
+> was not there. Keyword injection is limited to skills already evidenced in the resume.
+>
+> Not built: company-specific startup/enterprise modes, and metric enhancement advises rather
+> than inserting placeholder numbers.
+
+
 ## Overview
 The Resume Optimizer uses Generative AI to rewrite professional experiences and summaries to align with a specific job description's language and requirements.
 

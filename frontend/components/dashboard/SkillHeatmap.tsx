@@ -3,36 +3,31 @@
 import { motion } from "framer-motion";
 import { cn } from "@/lib/utils";
 
-const skills = [
-    { name: "Python", level: 5, status: "strong" },
-    { name: "FastAPI", level: 4, status: "strong" },
-    { name: "Docker", level: 3, status: "medium" },
-    { name: "Kubernetes", level: 1, status: "missing" },
-    { name: "Terraform", level: 1, status: "missing" },
-    { name: "Redis", level: 2, status: "gap" },
-    { name: "CI/CD", level: 2, status: "gap" },
-    { name: "AWS", level: 3, status: "medium" },
-    { name: "PostgreSQL", level: 4, status: "strong" },
-    { name: "React", level: 3, status: "medium" },
-    { name: "TypeScript", level: 2, status: "gap" },
-    { name: "GraphQL", level: 1, status: "missing" },
-];
+export interface HeatmapSkill {
+    name: string;
+    status: "strong" | "partial" | "gap" | "critical";
+    detail?: string;
+}
 
 const colorMap: Record<string, string> = {
-    strong: "bg-success/70 border-success/20 text-success",
-    medium: "bg-warning/60 border-warning/20 text-warning",
-    gap: "bg-orange-500/40 border-orange-500/20 text-orange-400",
-    missing: "bg-error/50 border-error/20 text-error",
+    strong: "bg-success/20 border-success/30 text-success",
+    partial: "bg-warning/20 border-warning/30 text-warning",
+    gap: "bg-orange-500/20 border-orange-500/30 text-orange-400",
+    critical: "bg-error/20 border-error/30 text-error",
 };
 
 const legendItems = [
-    { status: "strong", label: "Strong Match" },
-    { status: "medium", label: "Partial Match" },
-    { status: "gap", label: "Skill Gap" },
-    { status: "missing", label: "Missing" },
+    { status: "strong", label: "You have it" },
+    { status: "partial", label: "Partially covered" },
+    { status: "gap", label: "Gap" },
+    { status: "critical", label: "Critical gap" },
 ];
 
-export function SkillHeatmap() {
+/**
+ * Built from the alignment engine's matched / partial / missing lists, so a tile
+ * only appears if some job description actually asked for that skill.
+ */
+export function SkillHeatmap({ skills }: { skills: HeatmapSkill[] }) {
     return (
         <motion.div
             initial={{ opacity: 0, y: 16 }}
@@ -40,10 +35,10 @@ export function SkillHeatmap() {
             transition={{ duration: 0.4, delay: 0.1 }}
             className="card-elevated rounded-2xl p-6"
         >
-            <div className="flex items-center justify-between mb-4">
+            <div className="flex items-center justify-between mb-4 gap-4 flex-wrap">
                 <div>
                     <h3 className="text-sm font-semibold text-white">Skill Heatmap</h3>
-                    <p className="text-xs text-muted mt-1">Your skills vs. target JD requirements</p>
+                    <p className="text-xs text-muted mt-1">Your skills against what your target roles ask for</p>
                 </div>
                 <div className="flex gap-3 flex-wrap justify-end">
                     {legendItems.map((l) => (
@@ -54,24 +49,31 @@ export function SkillHeatmap() {
                     ))}
                 </div>
             </div>
-            <div className="flex flex-wrap gap-2">
-                {skills.map((skill, i) => (
-                    <motion.div
-                        key={skill.name}
-                        initial={{ opacity: 0, scale: 0.8 }}
-                        animate={{ opacity: 1, scale: 1 }}
-                        transition={{ delay: i * 0.04 }}
-                        whileHover={{ scale: 1.08, transition: { duration: 0.1 } }}
-                        className={cn(
-                            "px-3 py-1.5 rounded-lg border text-xs font-medium cursor-pointer transition-all",
-                            colorMap[skill.status]
-                        )}
-                        title={`${skill.name}: Level ${skill.level}/5`}
-                    >
-                        {skill.name}
-                    </motion.div>
-                ))}
-            </div>
+
+            {skills.length === 0 ? (
+                <p className="text-xs text-muted py-6 text-center">
+                    Analyze a resume against a job description to populate this.
+                </p>
+            ) : (
+                <div className="flex flex-wrap gap-2">
+                    {skills.map((skill, i) => (
+                        <motion.div
+                            key={`${skill.name}-${skill.status}`}
+                            initial={{ opacity: 0, scale: 0.8 }}
+                            animate={{ opacity: 1, scale: 1 }}
+                            transition={{ delay: Math.min(i * 0.03, 0.5) }}
+                            whileHover={{ scale: 1.06, transition: { duration: 0.1 } }}
+                            className={cn(
+                                "px-3 py-1.5 rounded-lg border text-xs font-medium cursor-default transition-all",
+                                colorMap[skill.status]
+                            )}
+                            title={skill.detail || skill.name}
+                        >
+                            {skill.name}
+                        </motion.div>
+                    ))}
+                </div>
+            )}
         </motion.div>
     );
 }

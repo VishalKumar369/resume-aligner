@@ -1,5 +1,13 @@
 # Resume Versioning
 
+> **Status: implemented, with deviations.**
+> Built as [backend/docs/optimization-engine.md](../backend/docs/optimization-engine.md) and
+> [backend/docs/persistence-and-readback.md](../backend/docs/persistence-and-readback.md).
+>
+> Deviations: files are written to **local disk** through the storage adapter, not S3. Rollback is
+> not implemented — versions are listed and downloadable, but nothing replaces the base resume.
+
+
 ## Overview
 Every time a resume is optimized or tailored for a specific JD, a new version is created. This allows users to track their progress and manage multiple submissions.
 

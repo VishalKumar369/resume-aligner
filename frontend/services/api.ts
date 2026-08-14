@@ -6,7 +6,8 @@ const api = axios.create({ baseURL: API_URL, headers: { "Content-Type": "applica
 
 const normalizeEmail = (email: string) => email.trim().toLowerCase();
 
-// Add request interceptor to inject JWT token
+// Attach the JWT. Every data endpoint is scoped to the token's owner, so a
+// request without one is rejected rather than served the wrong user's data.
 api.interceptors.request.use(
     (config) => {
         const token = useAuthStore.getState().token;
@@ -15,12 +16,32 @@ api.interceptors.request.use(
         }
         return config;
     },
+    (error) => Promise.reject(error)
+);
+
+// An expired or invalid token means the session is over; clear it so RouteGuard
+// sends the user to login instead of looping on 401s.
+api.interceptors.response.use(
+    (response) => response,
     (error) => {
+        if (error?.response?.status === 401 && typeof window !== "undefined") {
+            useAuthStore.getState().clearAuth();
+        }
         return Promise.reject(error);
     }
 );
 
-// Auth Service
+/** Pull a readable message out of an axios error. */
+export const apiErrorMessage = (error: any, fallback = "Something went wrong"): string => {
+    const detail = error?.response?.data?.detail;
+    if (typeof detail === "string") return detail;
+    if (Array.isArray(detail) && detail[0]?.msg) return detail[0].msg;
+    if (error?.message === "Network Error") return "Cannot reach the server. Is the backend running?";
+    return error?.message || fallback;
+};
+
+// ---------------------------------------------------------------------- auth
+
 export const authService = {
     signup: (data: { email: string; password: string; full_name: string }) =>
         api.post("/auth/signup", { ...data, email: normalizeEmail(data.email) }),
@@ -29,49 +50,76 @@ export const authService = {
         params.append("username", normalizeEmail(data.username));
         params.append("password", data.password);
         return api.post("/auth/login", params, {
-            headers: {
-                "Content-Type": "application/x-www-form-urlencoded"
-            }
+            headers: { "Content-Type": "application/x-www-form-urlencoded" },
         });
-    }
+    },
 };
 
-// Resume Service
+// -------------------------------------------------------------------- resume
+
 export const resumeService = {
     upload: (file: File, label?: string) => {
         const form = new FormData();
         form.append("file", file);
-        if (label && label.trim()) {
-            form.append("label", label.trim());
-        }
-        return api.post("/resume/upload", form, { headers: { "Content-Type": "multipart/form-data" } });
+        if (label && label.trim()) form.append("label", label.trim());
+        return api.post("/resume/upload", form, {
+            headers: { "Content-Type": "multipart/form-data" },
+        });
     },
-    getAll: () => api.get("/resume/list"),
-    optimize: (resumeId: string, jdId: string) => api.post("/resume/optimize", { resume_id: resumeId, jd_id: jdId }),
+    getAll: (params?: { skip?: number; limit?: number }) => api.get("/resume/list", { params }),
+    getById: (resumeId: string) => api.get(`/resume/${resumeId}`),
+    optimize: (resumeId: string, jdId: string, focusArea?: string) =>
+        api.post("/resume/optimize", {
+            resume_id: resumeId,
+            jd_id: jdId,
+            focus_area: focusArea || null,
+        }),
+    getVersions: (resumeId: string) => api.get(`/resume/${resumeId}/versions`),
+    downloadUrl: (versionId: string, format: "docx" | "pdf") =>
+        `${API_URL}/resume/versions/${versionId}/download?format=${format}`,
+    /** Downloads go through axios so the Authorization header is sent. */
+    download: (versionId: string, format: "docx" | "pdf") =>
+        api.get(`/resume/versions/${versionId}/download`, {
+            params: { format },
+            responseType: "blob",
+        }),
 };
 
-// JD Service
+// ------------------------------------------------------------------------ jd
+
 export const jdService = {
-    upload: (data: { raw_text: string; title: string; url?: string; company_name?: string }) => api.post("/jd/upload", data),
+    upload: (data: { raw_text: string; title: string; url?: string; company_name?: string }) =>
+        api.post("/jd/upload", data),
+    getAll: (params?: { skip?: number; limit?: number }) => api.get("/jd/list", { params }),
+    getById: (jdId: string) => api.get(`/jd/${jdId}`),
 };
 
-// Alignment Service
+// ----------------------------------------------------------------- alignment
+
 export const alignmentService = {
     generate: (resumeId: string, jdId: string) =>
         api.post("/alignment/generate", { resume_id: resumeId, jd_id: jdId }),
+    getAll: (params?: { resume_id?: string; jd_id?: string; latest_only?: boolean; limit?: number }) =>
+        api.get("/alignment/list", { params }),
+    getById: (alignmentId: string) => api.get(`/alignment/${alignmentId}`),
 };
 
-// Dashboard Service
+// ------------------------------------------------------- dashboard & learning
+
 export const dashboardService = {
     getSummary: () => api.get("/dashboard/summary"),
 };
 
-// Learning Service
 export const learningService = {
     getRoadmap: () => api.get("/learning/roadmap"),
 };
 
-// Company Service
 export const companyService = {
-    getInsights: (companyId: string) => api.get(`/company/${companyId}/insights`),
+    getInsights: (companyId: string) => api.get(`/company/${encodeURIComponent(companyId)}/insights`),
 };
+
+/** Matches the backend's slugify, so links built here resolve server-side. */
+export const companySlug = (name: string) =>
+    (name || "").toLowerCase().replace(/[^a-z0-9]+/g, "-").replace(/^-+|-+$/g, "");
+
+export default api;

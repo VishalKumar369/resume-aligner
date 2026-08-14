@@ -1,5 +1,14 @@
 # Deployment Architecture
 
+> **Status: not implemented — forward-looking design.**
+>
+> The repository contains **no Dockerfile, no docker-compose, no Kubernetes manifests, and no CI
+> configuration**. The application currently runs locally against a local PostgreSQL instance; see
+> [getting-started.md](getting-started.md).
+>
+> Retained as the intended deployment target.
+
+
 ## Overview
 The platform is designed to be cloud-agnostic, with a primary focus on containerized deployments using Docker and Kubernetes.
 

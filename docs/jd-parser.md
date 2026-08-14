@@ -1,5 +1,13 @@
 # Job Description (JD) Parser
 
+> **Status: implemented.**
+> Built as [backend/docs/jd-extraction.md](../backend/docs/jd-extraction.md).
+>
+> Deviation: skills are scoped to the sections that state requirements, so a term in the job
+> title is never read as a required skill, and mandatory is kept separate from preferred. The LLM
+> path exists but is off by default.
+
+
 ## Overview
 The JD Parser extracts critical requirements and company culture insights from job postings.
 

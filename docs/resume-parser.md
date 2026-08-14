@@ -1,5 +1,16 @@
 # Resume Parser
 
+> **Status: implemented, with deviations.**
+> Built as [backend/docs/extraction-pipeline.md](../backend/docs/extraction-pipeline.md) and
+> [backend/docs/structured-extraction.md](../backend/docs/structured-extraction.md).
+>
+> Deviations: uses `pdfplumber` with a `pypdf` fallback rather than PyMuPDF/pdfminer (permissive
+> licensing, better reading order on two-column layouts). OCR is stubbed, not implemented. The
+> LLM extraction step exists but is **off by default** — the heuristic extractor scores
+> confidence 1.0 on real resumes and a daily-metered quota is better spent elsewhere, see
+> [backend/docs/llm-budget.md](../backend/docs/llm-budget.md).
+
+
 ## Overview
 The Resume Parser is a dedicated service responsible for converting raw PDF/Docx files into a structured, machine-searchable JSON format.
 

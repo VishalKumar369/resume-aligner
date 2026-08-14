@@ -1,17 +1,26 @@
 import hashlib
+import os
+import re
 import uuid
 from io import BytesIO
 from typing import List, Optional
 
-from fastapi import APIRouter, Depends, File, Form, HTTPException, UploadFile
+from fastapi import APIRouter, Depends, File, Form, HTTPException, Query, UploadFile
+from fastapi.responses import FileResponse
 from sqlalchemy.ext.asyncio import AsyncSession
 
+from app.api.deps import get_current_user_id
 from app.db.session import get_db
+from app.models.jd import JobDescription
 from app.models.resume import Resume
+from app.models.version import ResumeVersion
 from app.repositories.resume_repo import ResumeRepository
+from app.repositories.version_repo import ResumeVersionRepository
 from app.schemas.resume import ResumeOptimizeRequest, ResumeOut
-from app.services.auth.default_user import get_or_create_default_user
+from app.schemas.version import OptimizeResponse, ResumeVersionOut
+from app.services.documents.writers import render_docx, render_pdf
 from app.services.extraction.types import FileType
+from app.services.optimization.engine import OptimizationEngine
 from app.services.parsing.resume_parser import ResumeParserService
 from app.services.storage.storage_adapter import get_storage
 
@@ -19,6 +28,12 @@ router = APIRouter()
 
 MAX_UPLOAD_BYTES = 5 * 1024 * 1024  # matches the 5MB limit advertised in the UI
 SUPPORTED_TYPES = {FileType.PDF, FileType.DOCX, FileType.TXT}
+MAX_PAGE_SIZE = 100
+
+DOWNLOAD_FORMATS = {
+    "docx": ("s3_path", "application/vnd.openxmlformats-officedocument.wordprocessingml.document"),
+    "pdf": ("pdf_path", "application/pdf"),
+}
 
 
 @router.post("/upload", response_model=ResumeOut)
@@ -26,6 +41,7 @@ async def upload_resume(
     file: UploadFile = File(...),
     label: Optional[str] = Form(None),
     db: AsyncSession = Depends(get_db),
+    owner_id: uuid.UUID = Depends(get_current_user_id),
 ):
     file_bytes = await file.read()
 
@@ -35,6 +51,17 @@ async def upload_resume(
         raise HTTPException(
             status_code=413,
             detail=f"File is too large. Maximum size is {MAX_UPLOAD_BYTES // (1024 * 1024)}MB.",
+        )
+
+    repo = ResumeRepository(Resume, db)
+    content_hash = hashlib.sha256(file_bytes).hexdigest()
+
+    # Re-uploading the same file returns the existing record: no second copy on
+    # disk, no repeated parse.
+    existing = await repo.get_by_content_hash(owner_id, content_hash)
+    if existing is not None:
+        return ResumeOut.model_validate(existing).model_copy(
+            update={"duplicate_of_existing": True}
         )
 
     parser = ResumeParserService()
@@ -60,49 +87,180 @@ async def upload_resume(
     structured_data = await parser.parse(extraction.text)
 
     storage = get_storage()
-    owner_id = await get_or_create_default_user(db)
     file_path = await storage.upload_file(BytesIO(file_bytes), file.filename)
 
-    repo = ResumeRepository(Resume, db)
     resume = await repo.create(obj_in={
         "owner_id": owner_id,
         "filename": file.filename,
         "label": (label or "").strip() or None,
         "s3_path": file_path,
-        "content_hash": hashlib.sha256(file_bytes).hexdigest(),
+        "content_hash": content_hash,
         "raw_text": extraction.text,
         "structured_data": structured_data,
-        "extraction_meta": _extraction_meta(extraction),
+        "extraction_meta": _extraction_meta(extraction, structured_data),
     })
     await db.commit()
     return resume
 
 
 @router.get("/list", response_model=List[ResumeOut])
-async def list_resumes(db: AsyncSession = Depends(get_db)):
+async def list_resumes(
+    skip: int = Query(0, ge=0),
+    limit: int = Query(50, ge=1, le=MAX_PAGE_SIZE),
+    db: AsyncSession = Depends(get_db),
+    owner_id: uuid.UUID = Depends(get_current_user_id),
+):
     repo = ResumeRepository(Resume, db)
-    return await repo.get_multi()
+    return await repo.get_by_owner(owner_id, skip=skip, limit=limit)
 
 
 @router.get("/{resume_id}", response_model=ResumeOut)
-async def get_resume(resume_id: uuid.UUID, db: AsyncSession = Depends(get_db)):
+async def get_resume(
+    resume_id: uuid.UUID,
+    db: AsyncSession = Depends(get_db),
+    owner_id: uuid.UUID = Depends(get_current_user_id),
+):
     repo = ResumeRepository(Resume, db)
     resume = await repo.get(resume_id)
-    if not resume:
+    # A resume belonging to someone else is indistinguishable from one that
+    # does not exist, so ownership is never leaked.
+    if not resume or resume.owner_id != owner_id:
         raise HTTPException(status_code=404, detail="Resume not found")
     return resume
 
 
-@router.post("/optimize")
-async def optimize_resume(payload: ResumeOptimizeRequest):
-    # The optimization engine is not implemented yet (planned phase).
-    raise HTTPException(
-        status_code=501,
-        detail="Resume optimization is not implemented yet.",
+@router.post("/optimize", response_model=OptimizeResponse)
+async def optimize_resume(
+    payload: ResumeOptimizeRequest,
+    db: AsyncSession = Depends(get_db),
+    owner_id: uuid.UUID = Depends(get_current_user_id),
+):
+    """Tailor a resume to one job description and store it as a new version."""
+    resume = await db.get(Resume, payload.resume_id)
+    jd = await db.get(JobDescription, payload.jd_id)
+    if not resume or not jd or resume.owner_id != owner_id or jd.owner_id != owner_id:
+        raise HTTPException(status_code=404, detail="Resume or JD not found")
+
+    parser = ResumeParserService()
+    resume_data = resume.structured_data or await parser.parse(resume.raw_text or "")
+    jd_data = jd.structured_data or {}
+
+    if not resume_data.get("experience") and not (resume_data.get("skills") or {}).get("hard_skills"):
+        raise HTTPException(
+            status_code=422,
+            detail="This resume has no readable experience or skills to optimize.",
+        )
+
+    result = await OptimizationEngine(db=db).optimize(
+        resume_data,
+        jd_data,
+        resume_text=resume.raw_text or "",
+        extraction_meta=resume.extraction_meta,
+    )
+
+    repo = ResumeVersionRepository(ResumeVersion, db)
+    version_number = await repo.next_version_number(payload.resume_id)
+    label = _version_label(jd, version_number)
+    stem = _version_stem(resume.filename, version_number)
+
+    storage = get_storage()
+    docx_path = await storage.upload_file(BytesIO(render_docx(result.optimized_data)), f"{stem}.docx")
+    pdf_path = await storage.upload_file(BytesIO(render_pdf(result.optimized_data)), f"{stem}.pdf")
+
+    version = await repo.create(obj_in={
+        "resume_id": payload.resume_id,
+        "jd_id": payload.jd_id,
+        "version_number": version_number,
+        "label": label,
+        "filename": f"{stem}.docx",
+        "s3_path": docx_path,
+        "pdf_path": pdf_path,
+        "changes_applied": result.changes,
+        "optimized_data": result.optimized_data,
+        "ats_score": result.ats_score,
+        "alignment_score": result.alignment_score,
+        "baseline_ats_score": result.baseline_ats_score,
+        "baseline_alignment_score": result.baseline_alignment_score,
+    })
+    await db.commit()
+
+    return OptimizeResponse(
+        version_id=version.id,
+        version_number=version_number,
+        label=label,
+        filename=version.filename,
+        baseline_ats_score=result.baseline_ats_score,
+        baseline_alignment_score=result.baseline_alignment_score,
+        ats_score=result.ats_score,
+        alignment_score=result.alignment_score,
+        ats_delta=result.ats_delta,
+        alignment_delta=result.alignment_delta,
+        changes=result.changes,
+        suggestions=result.suggestions,
+        blocked_rewrites=result.rejected_rewrites,
+        used_llm=result.used_llm,
+        from_cache=result.from_cache,
+        note=result.llm_note,
+        scoring_note=result.scoring_note,
+        download_docx=f"/api/v1/resume/versions/{version.id}/download?format=docx",
+        download_pdf=f"/api/v1/resume/versions/{version.id}/download?format=pdf",
     )
 
 
-def _extraction_meta(extraction) -> dict:
+@router.get("/versions/{version_id}/download")
+async def download_version(
+    version_id: uuid.UUID,
+    format: str = Query("docx", pattern="^(docx|pdf)$"),
+    db: AsyncSession = Depends(get_db),
+    owner_id: uuid.UUID = Depends(get_current_user_id),
+):
+    repo = ResumeVersionRepository(ResumeVersion, db)
+    version = await repo.get(version_id)
+    if not version or not await repo.is_owned_by(version, owner_id, db):
+        raise HTTPException(status_code=404, detail="Resume version not found")
+
+    attribute, media_type = DOWNLOAD_FORMATS[format]
+    path = getattr(version, attribute, None)
+    if not path or not os.path.exists(path):
+        raise HTTPException(
+            status_code=404,
+            detail=f"No {format.upper()} file stored for this version.",
+        )
+
+    stem = os.path.splitext(version.filename or "resume")[0]
+    return FileResponse(path, media_type=media_type, filename=f"{stem}.{format}")
+
+
+@router.get("/{resume_id}/versions", response_model=List[ResumeVersionOut])
+async def list_resume_versions(
+    resume_id: uuid.UUID,
+    skip: int = Query(0, ge=0),
+    limit: int = Query(50, ge=1, le=MAX_PAGE_SIZE),
+    db: AsyncSession = Depends(get_db),
+    owner_id: uuid.UUID = Depends(get_current_user_id),
+):
+    resume = await ResumeRepository(Resume, db).get(resume_id)
+    if not resume or resume.owner_id != owner_id:
+        raise HTTPException(status_code=404, detail="Resume not found")
+    repo = ResumeVersionRepository(ResumeVersion, db)
+    return await repo.list_for_resume(resume_id, skip=skip, limit=limit)
+
+
+def _version_label(jd: JobDescription, version_number: int) -> str:
+    target = " - ".join(
+        part for part in (jd.company_name, jd.title) if part and str(part).strip()
+    )
+    return f"v{version_number} tailored for {target}" if target else f"v{version_number}"
+
+
+def _version_stem(filename: Optional[str], version_number: int) -> str:
+    base = os.path.splitext(os.path.basename(filename or "resume"))[0]
+    safe = re.sub(r"[^A-Za-z0-9._-]+", "_", base).strip("._") or "resume"
+    return f"{safe}_optimized_v{version_number}"
+
+
+def _extraction_meta(extraction, structured_data: dict) -> dict:
+    """One record of how this resume was read: text extraction, then structuring."""
     return {
         "method": extraction.method.value,
         "file_type": extraction.file_type.value,
@@ -112,4 +270,5 @@ def _extraction_meta(extraction) -> dict:
         "used_ocr": extraction.used_ocr,
         "confidence": extraction.confidence,
         "warnings": [warning.value for warning in extraction.warnings],
+        "structuring": (structured_data or {}).get("extraction_meta", {}),
     }

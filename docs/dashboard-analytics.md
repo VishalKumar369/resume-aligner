@@ -1,5 +1,15 @@
 # Dashboard Analytics
 
+> **Status: implemented, with one deliberate omission.**
+> Built as [backend/docs/analytics-and-learning.md](../backend/docs/analytics-and-learning.md).
+>
+> **Interview probability is not a logistic regression model.** No hiring-outcome data exists
+> here, so rather than dress a guess up as a prediction the endpoint returns a transparent band
+> that ships its own formula and a caveat stating it is a heuristic. Career readiness and the
+> skill heatmap are as specified; there is no industry benchmark dataset for the resume strength
+> index.
+
+
 ## Overview
 Aggregates all engine outputs into high-level metrics for the user to track career progression.
 

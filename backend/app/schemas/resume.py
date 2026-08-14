@@ -21,6 +21,9 @@ class ResumeOut(ResumeBase):
     created_at: datetime
     structured_data: Optional[Dict[str, Any]] = None
     extraction_meta: Optional[Dict[str, Any]] = None
+    # True when an upload matched a resume already stored, so the existing
+    # record was returned instead of writing a second copy.
+    duplicate_of_existing: bool = False
 
     model_config = ConfigDict(from_attributes=True)
 

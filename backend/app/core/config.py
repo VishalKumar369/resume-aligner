@@ -41,7 +41,27 @@ class Settings(BaseSettings):
 
     LLM_MODEL: str = "gpt-4o-mini"
     GROQ_MODEL: str = "llama-3.3-70b-versatile"
-    GEMINI_MODEL: str = "gemini-2.0-flash"
+    GEMINI_MODEL: str = "gemini-2.5-flash"
+
+    # Which features may spend a model call.
+    #
+    # Free tiers are metered per day (Gemini reports a limit of 20/day for this
+    # project), so the budget goes where rules genuinely cannot compete. The
+    # heuristic extractors already parse this project's resumes at confidence
+    # 1.0 with correct companies and dates; rewriting prose is the one thing
+    # they cannot do at all.
+    LLM_FOR_RESUME_EXTRACTION: bool = False
+    LLM_FOR_JD_EXTRACTION: bool = False
+    LLM_FOR_ALIGNMENT: bool = False
+    LLM_FOR_BULLET_REWRITING: bool = True
+
+    # After a quota rejection, stop attempting calls for this long rather than
+    # burning latency on requests that are certain to fail.
+    LLM_QUOTA_COOLDOWN_SECONDS: int = 900
+
+    def llm_enabled_for(self, feature: str) -> bool:
+        """Whether `feature` may use a model, given the per-feature switches."""
+        return bool(getattr(self, f"LLM_FOR_{feature.upper()}", False))
 
     @property
     def ai_api_key(self) -> Optional[str]:

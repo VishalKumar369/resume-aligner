@@ -1,132 +1,116 @@
 # Resume-JD-Aligner
 
-Production-grade AI platform for ATS-optimized resume generation, hiring readiness analytics, and career roadmap planning.
+Analyses a resume against a job description, scores the match, and produces a tailored resume —
+without inventing anything the resume does not support.
 
-## Overview
-`resume-jd-aligner` is a sophisticated AI-driven platform that bridges the gap between candidates and job descriptions. It leverages Large Language Models (LLMs) and Vector Databases to provide deep semantic analysis of resumes against specific job requirements.
-
-### Problem Statement
-Most ATS (Applicant Tracking Systems) use keyword matching, causing many qualified candidates to be filtered out due to formatting or specific terminology. Furthermore, candidates often lack clear visibility into why they are not a match for a role or how to bridge their skill gaps.
-
-### Solution Vision
-A comprehensive suite that not only "hacks" the ATS score but truly aligns a candidate's profile with the JD, providing actionable learning paths and company-specific resume variants.
+📚 **[Documentation index](docs/README.md)** · 🚀 **[Getting started](docs/getting-started.md)**
 
 ---
 
-## Core Features
-- 🚀 **ATS Scoring & Optimization**: Detailed analysis of keyword density, formatting, and section completeness.
-- 🎯 **Semantic Alignment Engine**: Vector-based matching for skill, project, and responsibility overlap.
-- 📝 **Company-Specific Resume Generation**: AI-driven variant generation tailored to specific company cultures.
-- 🗺️ **Learning Roadmap**: Automated detection of skill gaps with prioritized learning resources.
-- 📊 **Hiring Readiness Analytics**: Interview probability scores and dashboard-level career tracking.
+## What it does
 
----
+Five steps, all working end to end:
 
-## Architecture Summary
-The system follows a modern microservice-ready modular monolith architecture.
+1. **Upload a resume** — PDF or DOCX is parsed into structured JSON, and the app shows you exactly
+   what it extracted so a bad parse is caught immediately.
+2. **Add a job description** — requirements are separated from nice-to-haves, with seniority and
+   experience read from the posting.
+3. **Review alignment** — a weighted score with a per-component breakdown, matched, partially
+   covered and missing skills, and gaps ranked by priority.
+4. **Optimize** — evidenced skills promoted, content reordered by relevance, bullets rewritten,
+   exported as `.docx` and PDF, stored as a version with before/after scores.
+5. **View analytics** — career readiness, gaps common across your target roles, a learning roadmap,
+   and per-company insights.
 
-- **Frontend**: Next.js (App Router), Tailwind CSS, Framer Motion.
-- **Backend**: FastAPI (Python 3.11+), Celery (Background Tasks).
-- **Database**: PostgreSQL with `pgvector` for semantic search.
-- **Cache/Queue**: Redis.
-- **AI/ML**: OpenAI GPT-4o, `text-embedding-3-large`.
-- **Storage**: AWS S3 or MinIO for document versioning.
+## Principles
 
----
+These shaped most of the design decisions:
 
-## System Workflow Diagram
-```text
-[Candidate] --> (Resume Upload) --+
-                                  |
-[Job Link]  --> (JD Scraper)    --+--> [Parsing Layer]
-                                           |
-                                     (JSON Extraction)
-                                           |
-                                    [Embedding Layer]
-                                           |
-                                 (pgvector / PostgreSQL)
-                                           |
-    +--------------------------------------+--------------------------------------+
-    |                                      |                                      |
-[Alignment Engine]                 [ATS Scoring Engine]                 [Skill Gap Engine]
-    |                                      |                                      |
-[Resume Optimizer]              [Dashboard Aggregator]               [Learning Roadmap]
-    |                                      |                                      |
-[Tailored Resume] <--------------- [Interactive UI] <-------------- [Career Analytics]
-```
+- **Nothing is invented.** Every rewritten bullet is diffed against its original and discarded if
+  it adds a figure, technology, or name that was not there. Skills are only surfaced when already
+  evidenced. Company insights report only what your own saved postings say.
+- **A broken parse is never scored as a weak candidate.** Every alignment carries extraction
+  health, so a 0% match is distinguishable from a file that could not be read.
+- **Uncertainty is stated.** The interview signal ships its own formula and says plainly that it
+  is a heuristic, not a model trained on hiring outcomes.
+- **Deterministic by default.** Extraction and scoring use no AI and are fully reproducible. A
+  model is optional and, by default, used only for rewriting prose.
 
----
+## Stack
 
-## Folder Structure
+| Layer | What is actually used |
+|---|---|
+| Frontend | Next.js 14 (App Router), Tailwind, Framer Motion, Recharts, Zustand |
+| Backend | FastAPI, SQLAlchemy 2.0 async, Alembic, Pydantic v2 |
+| Database | PostgreSQL |
+| Parsing | pdfplumber + pypdf, python-docx |
+| Documents | python-docx, ReportLab |
+| AI (optional) | Gemini / OpenAI / Groq — off by default except bullet rewriting |
+| Storage | Local disk via a pluggable storage adapter |
+
+**Not used**, despite appearing in the original design: `pgvector` and embeddings, Redis, Celery
+workers, and S3. See [docs/README.md](docs/README.md) for what was built versus designed.
+
+## Layout
+
 ```text
 resume-jd-aligner/
-├── backend/            # FastAPI Project
-│   ├── app/            # Main logic
-│   ├── db/             # pgvector schemas
-│   └── engines/        # Scoring & Ranking logic
-├── frontend/           # Next.js Application
-├── docs/               # Technical Documentation
-├── infra/              # Docker & Kubernetes configs
-└── scripts/            # Data migration & utility tools
+├── backend/
+│   ├── app/
+│   │   ├── api/v1/          route handlers
+│   │   ├── core/            config, security
+│   │   ├── db/              session, declarative base
+│   │   ├── models/          SQLAlchemy models
+│   │   ├── repositories/    query layer
+│   │   ├── schemas/         Pydantic contracts
+│   │   └── services/        extraction, parsing, alignment, ats,
+│   │                        optimization, documents, analytics, ai
+│   ├── alembic/versions/    migrations
+│   ├── tests/               237 tests, no DB or API key required
+│   └── docs/                implementation documentation
+├── frontend/
+│   ├── app/                 pages (App Router)
+│   ├── components/          UI and feature components
+│   ├── hooks/ services/     data fetching and API client
+│   └── docs/                frontend integration documentation
+└── docs/                    index, references, design intent
 ```
 
----
+## Quick start
 
-## Setup & Local Development
+```bash
+# database
+createdb resume_jd_aligner
 
-### Prerequisites
-- Python 3.11+
-- Node.js 18+
-- PostgreSQL (with pgvector extension)
-- Redis
+# backend
+python3 -m venv .venv
+.venv/bin/pip install -r backend/requirements.txt
+cp backend/.env.example backend/.env        # set SQLALCHEMY_DATABASE_URI and SECRET_KEY
+cd backend && ../.venv/bin/python -m alembic upgrade head
+../.venv/bin/python -m uvicorn app.main:app --port 8000 --reload
 
-### Environment Variables
-Create a `.env` file in the root:
-```env
-# API Keys
-OPENAI_API_KEY=sk-...
-S3_BUCKET_NAME=resume-versions
-
-# Database
-DATABASE_URL=postgresql://user:pass@localhost:5432/resume_db
-
-# Redis
-REDIS_URL=redis://localhost:6379/0
+# frontend (new terminal)
+cd frontend && npm install && npm run dev
 ```
 
-### Installation
-1. **Backend**:
-   ```bash
-   cd backend
-   pip install -r requirements.txt
-   python main.py
-   ```
-2. **Frontend**:
-   ```bash
-   cd frontend
-   npm install
-   npm run dev
-   ```
+Open `http://localhost:3000` and **sign up** — every data endpoint is scoped to the signed-in
+user. Full instructions and troubleshooting in [docs/getting-started.md](docs/getting-started.md).
 
----
+Works with no AI key at all. Adding one enables bullet rewriting; see
+[backend/docs/llm-budget.md](backend/docs/llm-budget.md) first, since free tiers are metered per
+day.
 
-## Roadmap Phases
-- **Phase 1**: Core Parser & Alignment Engine.
-- **Phase 2**: ATS Optimization & Skill Gap Detection.
-- **Phase 3**: Company-specific Generation & Learning Roadmap.
-- **Phase 4**: Advanced Analytics & Predictive Interview Readiness.
+## Tests
 
----
+```bash
+cd backend && ../.venv/bin/python -m pytest tests -q     # 237 tests
+cd frontend && npm run build
+```
 
-## Contribution Guidelines
-1. Fork the repository .
-2. Create a feature branch (`git checkout -b feature/amazing-feature`).
-3. Commit your changes.
-4. Push to the branch.
-5. Open a Pull Request.
+## Status
 
-## Future Scope
-- Integration with LinkedIn/Indeed APIs.
-- Real-time market demand trend analysis.
-- Multi-language resume support.
-- AI-driven cover letter generator.
+The five-step flow is complete and documented. Known gaps are recorded honestly in
+[docs/README.md](docs/README.md) and the phase log in
+[docs/backend-analysis-and-redesign-plan.md](docs/backend-analysis-and-redesign-plan.md) — the
+larger ones being OCR for scanned PDFs, JD fetching from a URL, semantic embeddings, and
+deployment configuration.

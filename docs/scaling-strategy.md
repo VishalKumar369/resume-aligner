@@ -1,5 +1,13 @@
 # Scaling Strategy
 
+> **Status: not implemented — forward-looking design.**
+>
+> No part of this is built. There are no Celery workers, no Redis queues, no batch processing, and
+> no horizontal scaling configuration. All work runs synchronously in a single API process.
+>
+> Retained as the intended direction once request volume justifies it.
+
+
 ## Overview
 To handle thousands of concurrent users and complex LLM pipelines, a multi-layered scaling strategy is implemented.
 

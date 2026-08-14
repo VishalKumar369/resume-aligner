@@ -1,5 +1,13 @@
 # Learning Roadmap Generator
 
+> **Status: implemented, with deviations.**
+> Built as [backend/docs/analytics-and-learning.md](../backend/docs/analytics-and-learning.md).
+>
+> Clustering, priority ordering and dependency ordering are as specified. Deviation: resources
+> come from a curated library of **official documentation** rather than Coursera/Udemy APIs. A
+> skill with no entry returns no resource rather than an invented link.
+
+
 ## Overview
 The Learning Roadmap Generator transforms identified skill gaps into a structured, time-bound educational path.
 

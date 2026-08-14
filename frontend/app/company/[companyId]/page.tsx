@@ -1,22 +1,52 @@
 "use client";
 
 import { motion } from "framer-motion";
-import { Building2, TrendingUp, Users, Star, ExternalLink } from "lucide-react";
+import { useParams } from "next/navigation";
+import { Building2, ExternalLink, Info } from "lucide-react";
 import { StatCard } from "@/components/ui/StatCard";
-
-const companyData = {
-    name: "Google",
-    tagline: "Engineering Excellence · Large Scale Systems",
-    alignmentScore: 88,
-    atsScore: 92,
-    hiringStatus: "Active",
-    primaryStack: ["Go", "C++", "Python", "Kubernetes", "GCP"],
-    cultureTags: ["High bar", "Data-driven", "Ownership culture", "Large-scale thinking"],
-    prepTips: "Focus on system design with high-throughput distributed systems. Google values clarity at scale — quantify everything. Practice Leetcode Hard.",
-    openRoles: ["Senior SWE", "Staff Engineer", "SRE", "ML Engineer"],
-};
+import { EmptyState, ErrorState, PriorityBadge, Skeleton, StatSkeletonRow } from "@/components/ui/States";
+import { useApi } from "@/hooks/useApi";
+import { companyService } from "@/services/api";
 
 export default function CompanyPage() {
+    const params = useParams();
+    const companyId = String(params?.companyId || "");
+    const { data, loading, error, reload } = useApi<any>(
+        () => companyService.getInsights(companyId),
+        [companyId]
+    );
+
+    if (loading) {
+        return (
+            <div className="max-w-5xl mx-auto space-y-6">
+                <Skeleton className="h-24 rounded-2xl" />
+                <StatSkeletonRow />
+                <Skeleton className="h-48 rounded-2xl" />
+            </div>
+        );
+    }
+
+    // The backend 404s when no saved posting mentions this company, rather than
+    // inventing a profile for it.
+    if (error) {
+        const notFound = error.toLowerCase().includes("no job descriptions");
+        return (
+            <div className="max-w-3xl mx-auto pt-10">
+                {notFound ? (
+                    <EmptyState
+                        title={`Nothing saved for "${companyId}"`}
+                        description="Company insights are built from the job descriptions you upload. Add a posting from this company to see what it asks for and how you match."
+                        actionLabel="Add a job description"
+                    />
+                ) : (
+                    <ErrorState message={error} onRetry={reload} />
+                )}
+            </div>
+        );
+    }
+
+    const gaps: any[] = data?.your_gaps_here || [];
+
     return (
         <div className="max-w-5xl mx-auto space-y-6">
             <div className="card-elevated rounded-2xl p-6">
@@ -25,53 +55,90 @@ export default function CompanyPage() {
                         <Building2 className="w-8 h-8 text-primary" />
                     </div>
                     <div>
-                        <div className="flex items-center gap-3">
-                            <h1 className="text-2xl font-bold">{companyData.name}</h1>
-                            <span className="px-2.5 py-1 bg-success/10 text-success border border-success/20 rounded-full text-xs font-medium">
-                                {companyData.hiringStatus}
-                            </span>
-                        </div>
-                        <p className="text-sm text-muted mt-1">{companyData.tagline}</p>
+                        <h1 className="text-2xl font-bold">{data.company}</h1>
+                        <p className="text-sm text-muted mt-1">
+                            {data.jd_count} saved posting{data.jd_count === 1 ? "" : "s"}
+                            {data.locations?.length > 0 && ` · ${data.locations.join(", ")}`}
+                            {data.work_modes?.length > 0 && ` · ${data.work_modes.join(", ")}`}
+                        </p>
                     </div>
                 </div>
             </div>
 
             <div className="grid grid-cols-2 lg:grid-cols-4 gap-4">
-                <StatCard title="Your Alignment" value={88} scoreType delay={0} />
-                <StatCard title="ATS Score" value={92} scoreType delay={0.05} />
-                <StatCard title="Open Roles" value={4} icon={Users} delay={0.1} />
-                <StatCard title="Culture Fit" value="High" icon={Star} subtitle="Based on resume tone" delay={0.15} />
+                <StatCard title="Your Best Alignment" value={data.your_best_alignment ?? 0} scoreType delay={0} />
+                <StatCard title="Your Average" value={data.your_average_alignment ?? 0} scoreType delay={0.05} />
+                <StatCard title="Roles Saved" value={data.roles?.length || 0} delay={0.1} />
+                <StatCard title="Gaps Here" value={gaps.length} delay={0.15} />
             </div>
 
             <div className="grid lg:grid-cols-2 gap-6">
                 <motion.div initial={{ opacity: 0, y: 16 }} animate={{ opacity: 1, y: 0 }} className="card-elevated rounded-2xl p-6">
-                    <h3 className="text-sm font-semibold mb-4">Primary Tech Stack</h3>
-                    <div className="flex flex-wrap gap-2">
-                        {companyData.primaryStack.map((tech) => (
-                            <span key={tech} className="px-3 py-1.5 bg-primary/10 text-primary border border-primary/20 rounded-lg text-sm font-medium">{tech}</span>
+                    <h3 className="text-sm font-semibold mb-3">What their postings ask for</h3>
+                    <div className="flex flex-wrap gap-2 mb-4">
+                        {data.demanded_skills?.map((skill: string) => (
+                            <span key={skill} className="px-2.5 py-1 bg-surface-2 border border-border rounded-lg text-xs">{skill}</span>
                         ))}
                     </div>
-                    <h3 className="text-sm font-semibold mb-3 mt-6">Culture Tags</h3>
-                    <div className="flex flex-wrap gap-2">
-                        {companyData.cultureTags.map((tag) => (
-                            <span key={tag} className="px-3 py-1.5 bg-surface-2 text-muted-foreground border border-border rounded-lg text-sm">{tag}</span>
-                        ))}
-                    </div>
+                    {data.preferred_skills?.length > 0 && (
+                        <>
+                            <p className="text-xs text-muted mb-2">Nice to have</p>
+                            <div className="flex flex-wrap gap-2">
+                                {data.preferred_skills.map((skill: string) => (
+                                    <span key={skill} className="px-2.5 py-1 bg-surface/40 border border-border/50 rounded-lg text-xs text-muted">{skill}</span>
+                                ))}
+                            </div>
+                        </>
+                    )}
                 </motion.div>
 
-                <motion.div initial={{ opacity: 0, y: 16 }} animate={{ opacity: 1, y: 0 }} transition={{ delay: 0.1 }} className="card-elevated rounded-2xl p-6">
-                    <h3 className="text-sm font-semibold mb-3">Interview Prep Tips</h3>
-                    <p className="text-sm text-muted-foreground leading-relaxed mb-6">{companyData.prepTips}</p>
-                    <h3 className="text-sm font-semibold mb-3">Active Openings</h3>
-                    <div className="space-y-2">
-                        {companyData.openRoles.map((role) => (
-                            <div key={role} className="flex items-center justify-between p-3 bg-surface-2 rounded-xl border border-border/50 hover:border-primary/30 transition-colors cursor-pointer">
-                                <span className="text-sm font-medium">{role}</span>
-                                <ExternalLink className="w-4 h-4 text-muted" />
-                            </div>
-                        ))}
-                    </div>
+                <motion.div initial={{ opacity: 0, y: 16 }} animate={{ opacity: 1, y: 0 }} transition={{ delay: 0.05 }} className="card-elevated rounded-2xl p-6">
+                    <h3 className="text-sm font-semibold mb-3">Your gaps for this company</h3>
+                    {gaps.length === 0 ? (
+                        <p className="text-sm text-muted">No gaps — you cover what these postings ask for.</p>
+                    ) : (
+                        <div className="space-y-2">
+                            {gaps.map((gap) => (
+                                <div key={gap.skill} className="flex items-center justify-between text-xs py-1.5 border-b border-border/40 last:border-0">
+                                    <span className="font-medium">{gap.skill}</span>
+                                    <div className="flex items-center gap-2">
+                                        <span className="text-muted">{gap.jd_count} role{gap.jd_count === 1 ? "" : "s"}</span>
+                                        <PriorityBadge priority={gap.priority} />
+                                    </div>
+                                </div>
+                            ))}
+                        </div>
+                    )}
                 </motion.div>
+            </div>
+
+            <div className="card-elevated rounded-2xl overflow-hidden">
+                <div className="p-5 border-b border-border">
+                    <h3 className="text-sm font-semibold">Saved postings</h3>
+                </div>
+                <div className="divide-y divide-border/50">
+                    {data.postings?.map((posting: any) => (
+                        <div key={posting.jd_id} className="p-4 flex items-center justify-between gap-4">
+                            <div className="min-w-0">
+                                <p className="text-sm truncate">{posting.title}</p>
+                                <p className="text-xs text-muted mt-0.5">
+                                    Added {posting.added_at ? new Date(posting.added_at).toLocaleDateString() : "—"}
+                                </p>
+                            </div>
+                            {posting.url && (
+                                <a href={posting.url} target="_blank" rel="noopener noreferrer"
+                                    className="text-xs text-primary hover:underline inline-flex items-center gap-1 flex-shrink-0">
+                                    Open <ExternalLink className="w-3 h-3" />
+                                </a>
+                            )}
+                        </div>
+                    ))}
+                </div>
+            </div>
+
+            <div className="flex items-start gap-2 text-xs text-muted">
+                <Info className="w-3.5 h-3.5 flex-shrink-0 mt-0.5" />
+                <span>{data.source}</span>
             </div>
         </div>
     );

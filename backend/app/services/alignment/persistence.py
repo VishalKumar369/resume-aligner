@@ -18,10 +18,20 @@ class AlignmentPersistenceService:
             ats_score=float(result.get("ats_score", 0.0)),
             skill_match_score=float(result.get("skill_match_score", 0.0)),
             experience_match_score=float(result.get("experience_match_score", 0.0)),
+            # The full picture is stored so the dashboard, skill-gap, and
+            # learning-roadmap features can build on it without re-scoring.
             analysis_data={
                 "missing_keywords": result.get("missing_keywords", []),
+                "missing_skills": result.get("missing_skills", []),
+                "matched_skills": result.get("matched_skills", []),
+                "partial_skills": result.get("partial_skills", []),
+                "breakdown": result.get("breakdown", {}),
+                "component_weights": result.get("component_weights", {}),
+                "ats_breakdown": result.get("ats_breakdown", {}),
+                "ats_warnings": result.get("ats_warnings", []),
                 "feedback": result.get("feedback", ""),
                 "improvement_suggestions": result.get("improvement_suggestions", []),
+                "extraction_health": result.get("extraction_health"),
             },
         )
         self.db.add(score)

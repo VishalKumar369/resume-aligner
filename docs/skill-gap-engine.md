@@ -1,5 +1,13 @@
 # Skill Gap Engine
 
+> **Status: implemented, with deviations.**
+> Built as [backend/docs/analytics-and-learning.md](../backend/docs/analytics-and-learning.md).
+>
+> P1/P2/P3 ranking and the multi-JD commonality gap are as specified. Deviation: there is **no
+> market-demand index** — no such dataset exists here, so gaps rank by how many of the user's own
+> target roles demand them, weighted by priority.
+
+
 ## Overview
 The Skill Gap Engine identifies the delta between a candidate's current capabilities and a target job's requirements.
 
