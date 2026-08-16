@@ -5,7 +5,8 @@ import { motion } from "framer-motion";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { FileText, Eye, EyeOff, ArrowRight, Check } from "lucide-react";
-import { authService } from "@/services/api";
+import { authService, userService } from "@/services/api";
+import { useAuthStore } from "@/store/authStore";
 
 const PLATFORM_NAME = process.env.NEXT_PUBLIC_PLATFORM_NAME || "Resume JD Aligner";
 
@@ -18,6 +19,7 @@ const benefits = [
 
 export default function SignupPage() {
     const router = useRouter();
+    const setUser = useAuthStore((s) => s.setUser);
     const [showPassword, setShowPassword] = useState(false);
     const [firstName, setFirstName] = useState("");
     const [lastName, setLastName] = useState("");
@@ -43,7 +45,27 @@ export default function SignupPage() {
                 password,
                 full_name: cleanFullName
             });
-            router.push("/auth/login");
+
+            // Sign the new user straight in so they land on the dashboard instead
+            // of retyping credentials; hydrate the real profile from /me.
+            const res = await authService.login({ username: cleanEmail, password });
+            const token = res.data.access_token;
+            setUser({ id: "", name: cleanFullName, email: cleanEmail }, token);
+            try {
+                const me = await userService.getMe();
+                setUser(
+                    {
+                        id: me.data.account.id,
+                        name: me.data.profile.full_name || cleanEmail,
+                        email: me.data.profile.email,
+                        targetRole: me.data.profile.target_role,
+                    },
+                    token
+                );
+            } catch {
+                // Best-effort hydration; the token alone is enough to proceed.
+            }
+            router.push("/dashboard");
         } catch (err: any) {
             setError(err.response?.data?.detail || "Something went wrong during signup");
         } finally {

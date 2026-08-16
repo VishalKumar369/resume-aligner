@@ -1,5 +1,6 @@
 from app.db.base import Base # noqa
 from app.models.user import User # noqa
+from app.models.settings import NotificationSettings # noqa
 from app.models.resume import Resume # noqa
 from app.models.jd import JobDescription # noqa
 from app.models.alignment import AlignmentScore # noqa

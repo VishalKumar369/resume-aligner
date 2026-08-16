@@ -16,10 +16,6 @@ async def get_dashboard_summary(
     db: AsyncSession = Depends(get_db),
     owner_id: uuid.UUID = Depends(get_current_user_id),
 ):
-    """Aggregated career metrics, computed from the user's own stored data.
-
-    Ownership is still the shared demo user, so this covers everything stored;
-    per-user scoping arrives with real authentication.
-    """
+    """Aggregated career metrics, computed from the signed-in user's own stored data."""
     service = DashboardAnalyticsService()
     return await service.get_summary(db, owner_id)

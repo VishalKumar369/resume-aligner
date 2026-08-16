@@ -9,11 +9,24 @@ import { useAuthStore } from "@/store/authStore";
 
 const PLATFORM_NAME = process.env.NEXT_PUBLIC_PLATFORM_NAME || "Resume JD Aligner";
 
+/** First letters of the first and last words, e.g. "John Doe" -> "JD". */
+function initialsOf(name: string): string {
+    const parts = name.trim().split(/\s+/).filter(Boolean);
+    if (parts.length === 0) return "U";
+    if (parts.length === 1) return parts[0][0]!.toUpperCase();
+    return (parts[0][0]! + parts[parts.length - 1][0]!).toUpperCase();
+}
+
 export function TopNavbar({ title }: { title?: string }) {
     const router = useRouter();
     const clearAuth = useAuthStore((state) => state.clearAuth);
+    const user = useAuthStore((state) => state.user);
     const [showProfileMenu, setShowProfileMenu] = useState(false);
     const menuRef = useRef<HTMLDivElement>(null);
+
+    const displayName = user?.name?.trim() || "Your account";
+    const email = user?.email || "";
+    const initials = initialsOf(user?.name || email || "U");
 
     useEffect(() => {
         const handleClickOutside = (event: MouseEvent) => {
@@ -68,23 +81,55 @@ export function TopNavbar({ title }: { title?: string }) {
                     <button
                         type="button"
                         onClick={() => setShowProfileMenu((prev) => !prev)}
+                        aria-haspopup="menu"
+                        aria-expanded={showProfileMenu}
+                        aria-label="Account menu"
                         className="flex items-center gap-2 p-1.5 rounded-xl hover:bg-surface-2 transition-colors"
                     >
-                        <div className="w-8 h-8 rounded-full bg-primary/20 border border-primary/30 flex items-center justify-center">
-                            <User className="w-4 h-4 text-primary" />
+                        <div className="w-8 h-8 rounded-full bg-primary/20 border border-primary/30 flex items-center justify-center text-xs font-semibold text-primary">
+                            {initials}
                         </div>
                     </button>
 
                     {showProfileMenu && (
-                        <div className="absolute right-0 top-full mt-2 w-40 rounded-xl border border-border bg-card shadow-lg py-2 z-50">
-                            <button
-                                onClick={handleLogout}
-                                className="flex w-full items-center gap-2 px-3 py-2 text-sm text-muted hover:bg-surface-2 hover:text-white transition-colors"
-                            >
-                                <LogOut className="w-4 h-4" />
-                                Logout
-                            </button>
-                        </div>
+                        <motion.div
+                            initial={{ opacity: 0, y: -6, scale: 0.98 }}
+                            animate={{ opacity: 1, y: 0, scale: 1 }}
+                            transition={{ duration: 0.12 }}
+                            role="menu"
+                            className="absolute right-0 top-full mt-2 w-64 rounded-xl border border-border bg-card shadow-lg z-50 overflow-hidden"
+                        >
+                            {/* Identity header */}
+                            <div className="flex items-center gap-3 px-4 py-3 border-b border-border">
+                                <div className="w-10 h-10 rounded-full bg-primary/20 border border-primary/30 flex items-center justify-center text-sm font-semibold text-primary flex-shrink-0">
+                                    {initials}
+                                </div>
+                                <div className="min-w-0">
+                                    <p className="text-sm font-medium text-white truncate">{displayName}</p>
+                                    {email && <p className="text-xs text-muted truncate">{email}</p>}
+                                </div>
+                            </div>
+
+                            <div className="py-1.5">
+                                <Link
+                                    href="/settings"
+                                    onClick={() => setShowProfileMenu(false)}
+                                    role="menuitem"
+                                    className="flex w-full items-center gap-2.5 px-4 py-2 text-sm text-muted hover:bg-surface-2 hover:text-white transition-colors"
+                                >
+                                    <User className="w-4 h-4" />
+                                    Account settings
+                                </Link>
+                                <button
+                                    onClick={handleLogout}
+                                    role="menuitem"
+                                    className="flex w-full items-center gap-2.5 px-4 py-2 text-sm text-error hover:bg-error/10 transition-colors"
+                                >
+                                    <LogOut className="w-4 h-4" />
+                                    Log out
+                                </button>
+                            </div>
+                        </motion.div>
                     )}
                 </div>
             </div>

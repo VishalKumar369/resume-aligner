@@ -43,6 +43,12 @@ Ordered as data flows through the system.
 | [../backend/docs/llm-budget.md](../backend/docs/llm-budget.md) | Per-feature LLM switches, caching, quota handling |
 | [../frontend/docs/frontend-integration.md](../frontend/docs/frontend-integration.md) | How each page is wired, auth, loading/empty/error states |
 
+## Planned
+
+| Document | |
+|---|---|
+| [../backend/docs/ocr-implementation-plan.md](../backend/docs/ocr-implementation-plan.md) | OCR for scanned PDFs — the step-by-step plan, not yet built |
+
 ## Design intent
 
 Written before the build. Each header records what was followed and what changed.

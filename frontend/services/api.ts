@@ -55,6 +55,29 @@ export const authService = {
     },
 };
 
+// ------------------------------------------------------------------ account
+
+export interface MeResponse {
+    profile: { full_name: string | null; email: string; target_role: string | null };
+    notifications: {
+        email_alerts_on_new_matches: boolean;
+        weekly_career_readiness_report: boolean;
+    };
+    account: { id: string; created_at: string };
+}
+
+/** Account settings, all scoped to the signed-in user by the JWT (no ids in the path). */
+export const userService = {
+    getMe: () => api.get<MeResponse>("/me"),
+    updateProfile: (data: { full_name?: string; target_role?: string }) =>
+        api.patch<MeResponse["profile"]>("/me/profile", data),
+    updateNotifications: (data: Partial<MeResponse["notifications"]>) =>
+        api.patch<MeResponse["notifications"]>("/me/notifications", data),
+    /** Blob so the JSON download flows through axios with the auth header attached. */
+    exportData: () => api.get("/me/export", { responseType: "blob" }),
+    deleteAccount: (password: string) => api.delete("/me", { data: { password } }),
+};
+
 // -------------------------------------------------------------------- resume
 
 export const resumeService = {

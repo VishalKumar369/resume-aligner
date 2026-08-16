@@ -5,7 +5,7 @@ import { motion } from "framer-motion";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { FileText, Eye, EyeOff, ArrowRight } from "lucide-react";
-import { authService } from "@/services/api";
+import { authService, userService } from "@/services/api";
 import { useAuthStore } from "@/store/authStore";
 
 const PLATFORM_NAME = process.env.NEXT_PUBLIC_PLATFORM_NAME || "Resume JD Aligner";
@@ -30,10 +30,25 @@ export default function LoginPage() {
                 password: password
             });
             const token = res.data.access_token;
-            
-            // For now, we only have the token and id in sub (if decoded), so we create a placeholder user
-            setUser({ id: "user", name: "User", email: cleanEmail }, token);
-            
+
+            // Seed the store with the token so the next request is authenticated,
+            // then hydrate the real profile from /me (login only returns a token).
+            setUser({ id: "", name: "", email: cleanEmail }, token);
+            try {
+                const me = await userService.getMe();
+                setUser(
+                    {
+                        id: me.data.account.id,
+                        name: me.data.profile.full_name || cleanEmail,
+                        email: me.data.profile.email,
+                        targetRole: me.data.profile.target_role,
+                    },
+                    token
+                );
+            } catch {
+                // Profile hydration is best-effort; the token alone is enough to proceed.
+            }
+
             // Redirect to dashboard on success
             router.push("/dashboard");
         } catch (err: any) {
