@@ -1,14 +1,15 @@
 "use client";
 
+import { useMemo, useState } from "react";
 import { motion } from "framer-motion";
-import { Target, Zap, BrainCircuit, BarChart2, Info } from "lucide-react";
+import { Target, Zap, Layers, Briefcase, AlertTriangle } from "lucide-react";
 import { StatCard } from "@/components/ui/StatCard";
 import { CareerRadarChart } from "@/components/dashboard/CareerRadarChart";
 import { SkillHeatmap, HeatmapSkill } from "@/components/dashboard/SkillHeatmap";
-import { CompanyTrackerTable } from "@/components/dashboard/CompanyTrackerTable";
+import { AnalysisTrackerTable, AnalysisRow } from "@/components/dashboard/AnalysisTrackerTable";
 import { EmptyState, ErrorState, StatSkeletonRow, Skeleton } from "@/components/ui/States";
 import { useApi } from "@/hooks/useApi";
-import { alignmentService, dashboardService } from "@/services/api";
+import { alignmentService } from "@/services/api";
 
 const priorityColor: Record<string, string> = {
     high: "border-l-error",
@@ -23,18 +24,24 @@ const priorityText: Record<string, string> = {
 };
 
 export default function DashboardPage() {
-    const { data: summary, loading, error, reload } = useApi<any>(() => dashboardService.getSummary());
-
-    // The radar needs the per-component breakdown, which lives on the alignment
-    // detail rather than the summary.
-    const { data: latestList } = useApi<any[]>(
-        () => alignmentService.getAll({ latest_only: true, limit: 1 }),
-        [summary?.totals?.alignments]
+    // Every stored run, newest first. Each is selectable and drives the section
+    // above; the whole dashboard reflects one analysis at a time.
+    const { data: analyses, loading, error, reload } = useApi<AnalysisRow[]>(
+        () => alignmentService.getAll({ limit: 100 })
     );
-    const { data: latestDetail } = useApi<any>(
-        () => alignmentService.getById(latestList![0].id),
-        [latestList?.[0]?.id],
-        { skip: !latestList?.length }
+
+    const [selectedId, setSelectedId] = useState<string | null>(null);
+    const activeId = selectedId ?? analyses?.[0]?.id ?? null;
+
+    const { data: detail, loading: detailLoading } = useApi<any>(
+        () => alignmentService.getById(activeId!),
+        [activeId],
+        { skip: !activeId }
+    );
+
+    const active = useMemo(
+        () => analyses?.find((a) => a.id === activeId) || null,
+        [analyses, activeId]
     );
 
     if (loading) {
@@ -52,7 +59,7 @@ export default function DashboardPage() {
 
     if (error) return <div className="max-w-7xl mx-auto"><ErrorState message={error} onRetry={reload} /></div>;
 
-    if (!summary?.has_data) {
+    if (!analyses?.length) {
         return (
             <div className="max-w-3xl mx-auto pt-10">
                 <EmptyState
@@ -63,41 +70,60 @@ export default function DashboardPage() {
         );
     }
 
-    const probability = summary.interview_probability || {};
-    const heatmap = buildHeatmap(summary, latestDetail);
-    const radarAxes = Object.entries(latestDetail?.breakdown || {}).map(([name, score]: any) => ({
+    const uniqueResumes = new Set(analyses.map((a) => a.resume_id)).size;
+    const uniqueRoles = new Set(analyses.map((a) => a.jd_id)).size;
+
+    const heatmap = detail ? buildHeatmap(detail) : [];
+    const improvements = detail ? buildImprovements(detail) : [];
+    const radarAxes = Object.entries(detail?.breakdown || {}).map(([name, score]: any) => ({
         skill: name.replace(/_match$/, "").replace(/_/g, " ").replace(/\b\w/g, (c: string) => c.toUpperCase()),
         score: Number(score),
     }));
+
+    const resumeUnhealthy = detail?.extraction_health && detail.extraction_health.resume_ok === false;
+    const analyzedOn = active?.created_at ? new Date(active.created_at).toLocaleDateString() : null;
 
     return (
         <motion.div initial={{ opacity: 0 }} animate={{ opacity: 1 }} className="space-y-6 max-w-7xl mx-auto">
             <div>
                 <h1 className="text-2xl font-bold text-white">Career Intelligence Dashboard</h1>
                 <p className="text-sm text-muted mt-1">
-                    {summary.totals.resumes} resume{summary.totals.resumes === 1 ? "" : "s"} ·{" "}
-                    {summary.totals.target_roles} target role{summary.totals.target_roles === 1 ? "" : "s"} ·{" "}
-                    {summary.totals.optimized_versions} optimized version{summary.totals.optimized_versions === 1 ? "" : "s"}
+                    {analyses.length} analys{analyses.length === 1 ? "is" : "es"} ·{" "}
+                    {uniqueResumes} resume{uniqueResumes === 1 ? "" : "s"} ·{" "}
+                    {uniqueRoles} role{uniqueRoles === 1 ? "" : "s"}
                 </p>
             </div>
 
-            <div className="grid grid-cols-2 lg:grid-cols-4 gap-4">
-                <StatCard title="Best ATS Score" value={summary.best_ats_score} icon={Target} scoreType
-                    subtitle={`avg ${Math.round(summary.avg_ats_score)}%`} delay={0} />
-                <StatCard title="Best JD Alignment" value={summary.best_alignment_score} icon={Zap} scoreType
-                    subtitle={`avg ${Math.round(summary.avg_alignment_score)}%`} delay={0.05} />
-                <StatCard title="Career Readiness" value={summary.career_readiness_index} icon={BrainCircuit} scoreType
-                    subtitle="across all target roles" delay={0.1} />
-                <StatCard title="Interview Signal" value={probability.band || "—"} icon={BarChart2}
-                    subtitle={probability.score ? `score ${Math.round(probability.score)}` : undefined} delay={0.15} />
+            {/* Selected-analysis context */}
+            <div className="flex flex-wrap items-baseline justify-between gap-2">
+                <div>
+                    <h2 className="text-lg font-semibold text-white">
+                        {active?.company || "Unknown company"}
+                        {active?.role ? <span className="text-muted font-normal"> — {active.role}</span> : null}
+                    </h2>
+                    <p className="text-xs text-muted mt-0.5">
+                        {active?.resume_label ? `${active.resume_label}` : "Selected analysis"}
+                        {analyzedOn ? ` · analyzed ${analyzedOn}` : ""}
+                    </p>
+                </div>
             </div>
 
-            {probability.caveat && (
-                <div className="flex items-start gap-2 text-xs text-muted">
-                    <Info className="w-3.5 h-3.5 flex-shrink-0 mt-0.5" />
-                    <span><strong className="text-muted-foreground">Interview signal:</strong> {probability.basis}. {probability.caveat}</span>
+            {resumeUnhealthy && (
+                <div className="bg-error/5 border border-error/20 rounded-xl p-3 flex gap-2.5">
+                    <AlertTriangle className="w-4 h-4 text-error flex-shrink-0 mt-0.5" />
+                    <p className="text-xs text-muted">
+                        This resume didn&apos;t extract cleanly, so these scores reflect a parsing
+                        problem rather than a poor match.
+                    </p>
                 </div>
             )}
+
+            <div className="grid grid-cols-2 lg:grid-cols-4 gap-4">
+                <StatCard title="JD Alignment" value={active?.alignment_score ?? 0} icon={Zap} scoreType delay={0} />
+                <StatCard title="ATS Score" value={active?.ats_score ?? 0} icon={Target} scoreType delay={0.05} />
+                <StatCard title="Skill Match" value={detail?.skill_match_score ?? 0} icon={Layers} scoreType delay={0.1} />
+                <StatCard title="Experience Match" value={detail?.experience_match_score ?? 0} icon={Briefcase} scoreType delay={0.15} />
+            </div>
 
             <div className="grid lg:grid-cols-3 gap-6">
                 <div className="lg:col-span-1">
@@ -111,9 +137,13 @@ export default function DashboardPage() {
                     className="lg:col-span-2 card-elevated rounded-2xl p-6"
                 >
                     <h3 className="text-sm font-semibold text-white mb-4">Recommended Improvements</h3>
-                    {summary.recommended_improvements?.length ? (
+                    {detailLoading ? (
                         <div className="space-y-3">
-                            {summary.recommended_improvements.map((item: any, i: number) => (
+                            {[0, 1, 2].map((i) => <Skeleton key={i} className="h-10 rounded-lg" />)}
+                        </div>
+                    ) : improvements.length ? (
+                        <div className="space-y-3">
+                            {improvements.map((item, i) => (
                                 <motion.div
                                     key={i}
                                     initial={{ opacity: 0, x: -10 }}
@@ -129,42 +159,28 @@ export default function DashboardPage() {
                             ))}
                         </div>
                     ) : (
-                        <p className="text-sm text-muted">Nothing to flag — your resume covers what your target roles ask for.</p>
+                        <p className="text-sm text-muted">Nothing to flag — this resume covers what the role asks for.</p>
                     )}
                 </motion.div>
             </div>
 
             <SkillHeatmap skills={heatmap} />
-            <CompanyTrackerTable matches={summary.top_company_matches || []} />
 
-            {summary.recent_activity?.length > 0 && (
-                <div className="card-elevated rounded-2xl p-6">
-                    <h3 className="text-sm font-semibold text-white mb-4">Recent Activity</h3>
-                    <div className="space-y-2">
-                        {summary.recent_activity.map((event: any, i: number) => (
-                            <div key={i} className="flex items-center justify-between text-xs py-1.5 border-b border-border/40 last:border-0">
-                                <span className="text-muted-foreground">{event.action}</span>
-                                <span className="text-muted truncate max-w-[45%]">{event.target}</span>
-                                <span className="text-muted">{event.date}</span>
-                            </div>
-                        ))}
-                    </div>
-                </div>
-            )}
+            <AnalysisTrackerTable analyses={analyses} activeId={activeId} onSelect={setSelectedId} />
         </motion.div>
     );
 }
 
 /**
- * Merge the latest run's matched/partial lists with the cross-role gap ranking,
- * so a skill demanded by several roles shows as critical rather than a plain gap.
+ * The selected run's own matched / partial / missing skills, as heatmap tiles.
+ * A missing skill flagged P1 shows as critical rather than a plain gap.
  */
-function buildHeatmap(summary: any, detail: any): HeatmapSkill[] {
+function buildHeatmap(detail: any): HeatmapSkill[] {
     const tiles: HeatmapSkill[] = [];
     const seen = new Set<string>();
 
     const push = (name: string, status: HeatmapSkill["status"], detailText?: string) => {
-        const key = name.toLowerCase();
+        const key = (name || "").toLowerCase();
         if (!name || seen.has(key)) return;
         seen.add(key);
         tiles.push({ name, status, detail: detailText });
@@ -174,13 +190,34 @@ function buildHeatmap(summary: any, detail: any): HeatmapSkill[] {
     (detail?.partial_skills || []).forEach((p: any) =>
         push(p.skill, "partial", `${p.skill}: partially covered by ${p.covered_by}`)
     );
-    (summary?.skill_gap_detail || []).forEach((gap: any) =>
-        push(
-            gap.skill,
-            gap.priority === "P1" ? "critical" : "gap",
-            `${gap.skill}: wanted by ${gap.jd_count} role${gap.jd_count === 1 ? "" : "s"}`
-        )
+    (detail?.missing_skills || []).forEach((m: any) =>
+        push(m.skill, m.priority === "P1" ? "critical" : "gap", `${m.skill}: missing (${m.importance || "wanted"})`)
     );
 
     return tiles;
+}
+
+/**
+ * Concrete next actions for this run: the model's own suggestions, ATS warnings,
+ * and the top missing skills ranked by priority.
+ */
+function buildImprovements(detail: any): { text: string; priority: string }[] {
+    const items: { text: string; priority: string }[] = [];
+    const seen = new Set<string>();
+
+    const add = (text: string, priority: string) => {
+        const key = text.trim().toLowerCase();
+        if (!text.trim() || seen.has(key)) return;
+        seen.add(key);
+        items.push({ text: text.trim(), priority });
+    };
+
+    (detail?.missing_skills || []).slice(0, 3).forEach((m: any) =>
+        add(`Add evidence of ${m.skill} — ${m.importance === "mandatory" ? "required" : "preferred"} for this role.`,
+            m.priority === "P1" ? "high" : "medium")
+    );
+    (detail?.improvement_suggestions || []).forEach((s: string) => add(s, "medium"));
+    (detail?.ats_warnings || []).forEach((w: string) => add(w, "low"));
+
+    return items.slice(0, 6);
 }

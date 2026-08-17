@@ -60,6 +60,11 @@ class AlignmentSummarySchema(BaseModel):
     skill_match_score: Optional[float] = None
     experience_match_score: Optional[float] = None
     created_at: datetime
+    # Labels for rendering a readable list. Populated by the list endpoint from
+    # the run's JD and resume; absent (None) on single-run reads.
+    company: Optional[str] = None
+    role: Optional[str] = None
+    resume_label: Optional[str] = None
 
 class AlignmentDetailSchema(AlignmentSummarySchema):
     """A stored run with the full analysis, from GET /alignment/{id}."""

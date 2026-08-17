@@ -59,6 +59,31 @@ class TestSummaryMapping:
         assert summary.alignment_score == 0.0
         assert summary.ats_score == 0.0
 
+    def test_labels_the_run_with_its_company_role_and_resume(self):
+        jd = SimpleNamespace(id=uuid.uuid4(), title="Senior Backend Engineer", company_name="Acme")
+        resume = SimpleNamespace(id=uuid.uuid4(), label="Main Tech Resume", filename="cv.pdf")
+
+        summary = _to_summary(stored_row(), jd=jd, resume=resume)
+
+        assert summary.company == "Acme"
+        assert summary.role == "Senior Backend Engineer"
+        assert summary.resume_label == "Main Tech Resume"
+
+    def test_falls_back_to_the_filename_when_the_resume_has_no_label(self):
+        resume = SimpleNamespace(id=uuid.uuid4(), label=None, filename="cv.pdf")
+        assert _to_summary(stored_row(), resume=resume).resume_label == "cv.pdf"
+
+    def test_labels_are_none_on_a_single_run_read(self):
+        # get_alignment / _to_detail pass no JD or resume.
+        summary = _to_summary(stored_row())
+        assert summary.company is None
+        assert summary.role is None
+        assert summary.resume_label is None
+
+    def test_company_is_none_when_the_jd_has_no_company_name(self):
+        jd = SimpleNamespace(id=uuid.uuid4(), title="Engineer", company_name=None)
+        assert _to_summary(stored_row(), jd=jd).company is None
+
     def test_summary_carries_no_analysis_payload(self):
         # List rows stay small as history grows.
         fields = _to_summary(stored_row()).model_dump()

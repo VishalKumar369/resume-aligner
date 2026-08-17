@@ -268,6 +268,14 @@ describe("jd, alignment, dashboard and learning services", () => {
         });
     });
 
+    it("lists every run for the dashboard tracker", () => {
+        alignmentService.getAll({ limit: 100 });
+
+        expect(axiosInstance.get).toHaveBeenCalledWith("/alignment/list", {
+            params: { limit: 100 },
+        });
+    });
+
     it("hits the dashboard and learning endpoints", () => {
         dashboardService.getSummary();
         learningService.getRoadmap();
