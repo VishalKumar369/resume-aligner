@@ -2,7 +2,7 @@
 
 import { useState, useCallback } from "react";
 import { motion, AnimatePresence } from "framer-motion";
-import { useDropzone } from "react-dropzone";
+import { useDropzone, type FileRejection } from "react-dropzone";
 import { useRouter } from "next/navigation";
 import {
     Upload, FileText, CheckCircle, Loader2, Link as LinkIcon, Sparkles,
@@ -35,11 +35,34 @@ export default function UploadPage() {
     const [summary, setSummary] = useState<any>(null);
     const [error, setError] = useState<string | null>(null);
 
-    const onDrop = useCallback((accepted: File[]) => {
+    // react-dropzone hands rejected files to the second argument instead of
+    // onDrop's accepted list, so an image or a .txt would otherwise vanish
+    // silently. Turn the rejection code into a message that names the fix.
+    const onDrop = useCallback((accepted: File[], rejections: FileRejection[]) => {
         if (accepted[0]) {
             setUploadedFile(accepted[0]);
             setResume(null);
             setError(null);
+            return;
+        }
+
+        const rejection = rejections[0];
+        if (!rejection) return;
+
+        const code = rejection.errors[0]?.code;
+        if (code === "file-invalid-type") {
+            const ext = rejection.file.name.split(".").pop()?.toLowerCase();
+            setError(
+                `We can't read ${ext ? `.${ext}` : "that"} files. Upload your resume as a PDF or DOCX — images and scanned files can't be parsed.`
+            );
+        } else if (code === "file-too-large") {
+            setError(
+                `"${rejection.file.name}" is over the 5MB limit. Try compressing it or exporting a fresh PDF.`
+            );
+        } else if (code === "too-many-files") {
+            setError("Please upload one resume at a time.");
+        } else {
+            setError(rejection.errors[0]?.message || "That file couldn't be accepted.");
         }
     }, []);
 
