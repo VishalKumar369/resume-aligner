@@ -55,7 +55,12 @@ class DocumentExtractionService:
             result.detail = "RTF files are not supported. Please upload a PDF or .docx."
         else:
             result.add_warning(ExtractionWarning.UNSUPPORTED_TYPE)
-            result.detail = f"Unrecognised file format for '{filename or 'upload'}'."
+            # Name the supported formats: for an image or other binary the user
+            # needs to know what to upload instead, not just that this failed.
+            result.detail = (
+                f"'{filename or 'This file'}' isn't a supported format. "
+                "Please upload your resume as a PDF or .docx."
+            )
 
         self._finalize(result)
         return result
