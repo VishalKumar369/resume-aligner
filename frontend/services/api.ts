@@ -91,11 +91,16 @@ export const resumeService = {
     },
     getAll: (params?: { skip?: number; limit?: number }) => api.get("/resume/list", { params }),
     getById: (resumeId: string) => api.get(`/resume/${resumeId}`),
-    optimize: (resumeId: string, jdId: string, focusArea?: string) =>
+    optimize: (
+        resumeId: string,
+        jdId: string,
+        options: { focusArea?: string; pagePreference?: "single" | "multi" } = {}
+    ) =>
         api.post("/resume/optimize", {
             resume_id: resumeId,
             jd_id: jdId,
-            focus_area: focusArea || null,
+            focus_area: options.focusArea || null,
+            page_preference: options.pagePreference || "single",
         }),
     getVersions: (resumeId: string) => api.get(`/resume/${resumeId}/versions`),
     downloadUrl: (versionId: string, format: "docx" | "pdf") =>

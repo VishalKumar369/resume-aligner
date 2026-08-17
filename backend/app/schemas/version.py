@@ -49,5 +49,13 @@ class OptimizeResponse(BaseModel):
     note: Optional[str] = None
     scoring_note: Optional[str] = None
 
+    # Length handling. When single-page was requested, `page_count` is the final
+    # rendered length and `single_page_fit` says whether it actually fit.
+    single_page: bool = False
+    page_count: int = 1
+    trimmed_bullets: int = 0
+    single_page_fit: bool = True
+    length_note: Optional[str] = None
+
     download_docx: str
     download_pdf: str

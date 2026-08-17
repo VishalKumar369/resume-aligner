@@ -194,13 +194,25 @@ describe("resumeService", () => {
         expect((axiosInstance.post.mock.calls[1][1] as FormData).has("label")).toBe(false);
     });
 
-    it("sends optimize with a null focus area when none is chosen", () => {
+    it("sends optimize with a null focus area and single-page default", () => {
         resumeService.optimize("r-1", "j-1");
 
         expect(axiosInstance.post).toHaveBeenCalledWith("/resume/optimize", {
             resume_id: "r-1",
             jd_id: "j-1",
             focus_area: null,
+            page_preference: "single",
+        });
+    });
+
+    it("passes the chosen page preference and focus area", () => {
+        resumeService.optimize("r-1", "j-1", { pagePreference: "multi", focusArea: "backend" });
+
+        expect(axiosInstance.post).toHaveBeenCalledWith("/resume/optimize", {
+            resume_id: "r-1",
+            jd_id: "j-1",
+            focus_area: "backend",
+            page_preference: "multi",
         });
     });
 
