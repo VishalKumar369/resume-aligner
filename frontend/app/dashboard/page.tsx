@@ -125,17 +125,18 @@ export default function DashboardPage() {
                 <StatCard title="Experience Match" value={detail?.experience_match_score ?? 0} icon={Briefcase} scoreType delay={0.15} />
             </div>
 
-            {/* Both panels share one height; recommendations scroll past it. */}
-            <div className="grid lg:grid-cols-3 gap-6 lg:h-[440px]">
-                <div className="lg:col-span-1 lg:h-full">
-                    <CareerRadarChart axes={radarAxes} className="h-full" />
+            {/* Both panels are the same fixed height; recommendations scroll
+                within theirs so the content can't overflow onto the heatmap. */}
+            <div className="grid lg:grid-cols-3 gap-6 lg:items-start">
+                <div className="lg:col-span-1">
+                    <CareerRadarChart axes={radarAxes} className="lg:h-[440px]" />
                 </div>
 
                 <motion.div
                     initial={{ opacity: 0, y: 16 }}
                     animate={{ opacity: 1, y: 0 }}
                     transition={{ delay: 0.25 }}
-                    className="lg:col-span-2 card-elevated rounded-2xl p-6 flex flex-col lg:h-full"
+                    className="lg:col-span-2 card-elevated rounded-2xl p-6 flex flex-col lg:h-[440px]"
                 >
                     <h3 className="text-sm font-semibold text-white mb-4 flex-shrink-0">Recommended Improvements</h3>
                     {detailLoading ? (
