@@ -125,24 +125,25 @@ export default function DashboardPage() {
                 <StatCard title="Experience Match" value={detail?.experience_match_score ?? 0} icon={Briefcase} scoreType delay={0.15} />
             </div>
 
-            <div className="grid lg:grid-cols-3 gap-6">
-                <div className="lg:col-span-1">
-                    <CareerRadarChart axes={radarAxes} />
+            {/* Both panels share one height; recommendations scroll past it. */}
+            <div className="grid lg:grid-cols-3 gap-6 lg:h-[440px]">
+                <div className="lg:col-span-1 lg:h-full">
+                    <CareerRadarChart axes={radarAxes} className="h-full" />
                 </div>
 
                 <motion.div
                     initial={{ opacity: 0, y: 16 }}
                     animate={{ opacity: 1, y: 0 }}
                     transition={{ delay: 0.25 }}
-                    className="lg:col-span-2 card-elevated rounded-2xl p-6"
+                    className="lg:col-span-2 card-elevated rounded-2xl p-6 flex flex-col lg:h-full"
                 >
-                    <h3 className="text-sm font-semibold text-white mb-4">Recommended Improvements</h3>
+                    <h3 className="text-sm font-semibold text-white mb-4 flex-shrink-0">Recommended Improvements</h3>
                     {detailLoading ? (
                         <div className="space-y-3">
                             {[0, 1, 2].map((i) => <Skeleton key={i} className="h-10 rounded-lg" />)}
                         </div>
                     ) : improvements.length ? (
-                        <div className="space-y-3">
+                        <div className="space-y-3 overflow-y-auto pr-1 flex-1 min-h-0">
                             {improvements.map((item, i) => (
                                 <motion.div
                                     key={i}
