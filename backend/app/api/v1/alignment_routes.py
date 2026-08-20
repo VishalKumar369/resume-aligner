@@ -2,6 +2,7 @@ import uuid
 from typing import Any, Dict, List, Optional
 
 from fastapi import APIRouter, Depends, HTTPException, Query
+from sqlalchemy import select
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.api.deps import get_current_user_id
@@ -58,7 +59,20 @@ async def list_alignments(
         skip=skip,
         limit=limit,
     )
-    return [_to_summary(row) for row in rows]
+
+    # Batch-load the JDs and resumes these runs reference, so each row can be
+    # labelled "Company - Role" without a per-row query.
+    jds = await _by_id(db, JobDescription, {row.jd_id for row in rows})
+    resumes = await _by_id(db, Resume, {row.resume_id for row in rows})
+    return [_to_summary(row, jds.get(row.jd_id), resumes.get(row.resume_id)) for row in rows]
+
+
+async def _by_id(db: AsyncSession, model, ids) -> Dict[uuid.UUID, Any]:
+    ids = [i for i in ids if i is not None]
+    if not ids:
+        return {}
+    rows = (await db.execute(select(model).where(model.id.in_(ids)))).scalars().all()
+    return {row.id: row for row in rows}
 
 
 @router.get("/{alignment_id}", response_model=AlignmentDetailSchema)
@@ -82,7 +96,11 @@ async def _assert_owns_pair(db, resume_id, jd_id, owner_id) -> None:
         raise HTTPException(status_code=404, detail="Resume or JD not found")
 
 
-def _to_summary(row: AlignmentScore) -> AlignmentSummarySchema:
+def _to_summary(
+    row: AlignmentScore,
+    jd: Optional[JobDescription] = None,
+    resume: Optional[Resume] = None,
+) -> AlignmentSummarySchema:
     return AlignmentSummarySchema(
         id=row.id,
         resume_id=row.resume_id,
@@ -94,6 +112,11 @@ def _to_summary(row: AlignmentScore) -> AlignmentSummarySchema:
         skill_match_score=row.skill_match_score,
         experience_match_score=row.experience_match_score,
         created_at=row.created_at,
+        # Labels are best-effort: a single-run read passes neither, and a JD may
+        # carry no company name.
+        company=(jd.company_name if jd else None),
+        role=(jd.title if jd else None),
+        resume_label=((resume.label or resume.filename) if resume else None),
     )
 
 

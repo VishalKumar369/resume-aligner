@@ -2,6 +2,7 @@
 
 import { RadarChart, PolarGrid, PolarAngleAxis, Radar, ResponsiveContainer, Tooltip } from "recharts";
 import { motion } from "framer-motion";
+import { cn } from "@/lib/utils";
 
 interface Axis { skill: string; score: number }
 
@@ -21,7 +22,7 @@ const CustomTooltip = ({ active, payload }: any) => {
  * Each axis is one scoring component from the latest alignment, so the shape
  * shows where the match is actually strong or weak.
  */
-export function CareerRadarChart({ axes }: { axes: Axis[] }) {
+export function CareerRadarChart({ axes, className }: { axes: Axis[]; className?: string }) {
     const hasEnoughAxes = axes.length >= 3;
 
     return (
@@ -29,7 +30,7 @@ export function CareerRadarChart({ axes }: { axes: Axis[] }) {
             initial={{ opacity: 0, scale: 0.95 }}
             animate={{ opacity: 1, scale: 1 }}
             transition={{ duration: 0.4, delay: 0.2 }}
-            className="card-elevated rounded-2xl p-6"
+            className={cn("card-elevated rounded-2xl p-6", className)}
         >
             <div className="mb-4">
                 <h3 className="text-sm font-semibold text-white">Alignment Breakdown</h3>

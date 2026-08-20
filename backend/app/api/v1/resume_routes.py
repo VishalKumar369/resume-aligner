@@ -156,6 +156,7 @@ async def optimize_resume(
         jd_data,
         resume_text=resume.raw_text or "",
         extraction_meta=resume.extraction_meta,
+        single_page=payload.page_preference == "single",
     )
 
     repo = ResumeVersionRepository(ResumeVersion, db)
@@ -202,6 +203,11 @@ async def optimize_resume(
         from_cache=result.from_cache,
         note=result.llm_note,
         scoring_note=result.scoring_note,
+        single_page=result.single_page,
+        page_count=result.page_count,
+        trimmed_bullets=result.trimmed_bullets,
+        single_page_fit=result.single_page_fit,
+        length_note=result.length_note,
         download_docx=f"/api/v1/resume/versions/{version.id}/download?format=docx",
         download_pdf=f"/api/v1/resume/versions/{version.id}/download?format=pdf",
     )

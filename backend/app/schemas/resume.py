@@ -1,5 +1,5 @@
 from datetime import datetime
-from typing import Optional, Any, Dict
+from typing import Any, Dict, Literal, Optional
 from uuid import UUID
 from pydantic import BaseModel, ConfigDict
 
@@ -35,3 +35,6 @@ class ResumeOptimizeRequest(BaseModel):
     resume_id: UUID
     jd_id: UUID
     focus_area: Optional[str] = None
+    # "single" condenses the resume to fit one page (quantity trimmed, the most
+    # job-relevant content kept); "multi" leaves it at its natural length.
+    page_preference: Literal["single", "multi"] = "single"

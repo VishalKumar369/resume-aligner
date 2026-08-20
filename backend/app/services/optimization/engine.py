@@ -21,6 +21,7 @@ from app.services.alignment.scorer import AlignmentScorerService
 from app.services.ats.ats_scorer import ATSScorerService
 from app.services.documents.writers import render_text
 from app.services.optimization.bullet_advisor import BulletAdvisor
+from app.services.optimization.condenser import SinglePageCondenser
 from app.services.optimization.llm_bullet_rewriter import LLMBulletRewriter
 from app.services.optimization.reorderer import Reorderer
 from app.services.optimization.skill_promoter import SkillPromoter
@@ -43,6 +44,15 @@ class OptimizationResult:
     used_llm: bool = False
     from_cache: bool = False
     llm_note: Optional[str] = None
+
+    # Single-page condensing. `page_count` is the final rendered length; when a
+    # single page was requested but the content could not be trimmed to fit
+    # without going below each role's bullet floor, `single_page_fit` is False.
+    single_page: bool = False
+    page_count: int = 1
+    trimmed_bullets: int = 0
+    single_page_fit: bool = True
+    length_note: Optional[str] = None
     # Explains why these figures can differ from the headline alignment score.
     scoring_note: str = (
         "Before and after are both scored deterministically so the change is a "
@@ -70,6 +80,7 @@ class OptimizationEngine:
         reorderer: Optional[Reorderer] = None,
         advisor: Optional[BulletAdvisor] = None,
         rewriter: Optional[LLMBulletRewriter] = None,
+        condenser: Optional[SinglePageCondenser] = None,
         ats_scorer: Optional[ATSScorerService] = None,
         alignment_scorer: Optional[AlignmentScorerService] = None,
         use_llm: Optional[bool] = None,
@@ -79,6 +90,7 @@ class OptimizationEngine:
         self.reorderer = reorderer or Reorderer()
         self.advisor = advisor or BulletAdvisor()
         self.rewriter = rewriter or LLMBulletRewriter()
+        self.condenser = condenser or SinglePageCondenser()
         self.ats_scorer = ats_scorer or ATSScorerService()
         # Scoring here is always deterministic, even when bullet rewriting uses a
         # model. The before/after pair only means something if both sides are
@@ -95,8 +107,9 @@ class OptimizationEngine:
         jd_data: Dict[str, Any],
         resume_text: str = "",
         extraction_meta: Optional[Dict[str, Any]] = None,
+        single_page: bool = False,
     ) -> OptimizationResult:
-        result = OptimizationResult()
+        result = OptimizationResult(single_page=single_page)
 
         baseline = await self._score(resume_data, jd_data, resume_text, extraction_meta)
         result.baseline_ats_score, result.baseline_alignment_score = baseline
@@ -107,13 +120,19 @@ class OptimizationEngine:
         rewritten_originals = await self._rewrite_bullets(optimized, jd_data, result)
         self._reorder(optimized, jd_data, result)
 
+        # Condense last, once the strongest, most relevant bullets have already
+        # been surfaced by reordering - so what gets trimmed is genuinely the
+        # lowest-value tail. Scoring then runs on the trimmed document below.
+        if single_page:
+            self._condense_to_single_page(optimized, jd_data, result)
+
         result.suggestions = self.advisor.advise(optimized, jd_data, skip=rewritten_originals)
         result.optimized_data = optimized
 
         # The generated document is what a screener will actually read, so the
         # new scores are computed against its rendering, not the original file.
         optimized_text = render_text(optimized)
-        optimized_meta = self._generated_document_meta(optimized_text)
+        optimized_meta = self._generated_document_meta(optimized_text, result.page_count)
         result.ats_score, result.alignment_score = await self._score(
             optimized, jd_data, optimized_text, optimized_meta
         )
@@ -236,6 +255,30 @@ class OptimizationEngine:
         for description in reorder.changes:
             result.changes.append({"type": "reordered", "description": description})
 
+    def _condense_to_single_page(
+        self, optimized: Dict[str, Any], jd_data: Dict[str, Any], result: OptimizationResult
+    ) -> None:
+        condensed = self.condenser.condense(optimized, jd_data)
+        result.page_count = condensed.page_count
+        result.trimmed_bullets = condensed.removed_bullets
+        result.single_page_fit = condensed.fits
+        result.changes.extend(condensed.changes)
+
+        if condensed.total_removed and condensed.fits:
+            # The summarizing change carries the itemised detail; keep the note short.
+            result.length_note = (
+                "Condensed to a single page, keeping your skills, work history, "
+                "education, and the most job-relevant content."
+            )
+        elif not condensed.fits:
+            # Should be rare: even after dropping supplementary content the core
+            # resume still overflows (e.g. a very long work history).
+            result.length_note = (
+                f"Even after condensing, the core content still needs "
+                f"{condensed.page_count} pages. Every section was kept because "
+                "cutting more would remove work history or education."
+            )
+
     async def _score(
         self,
         resume_data: Dict[str, Any],
@@ -248,7 +291,7 @@ class OptimizationEngine:
         )
         return alignment.ats_score, alignment.alignment_score
 
-    def _generated_document_meta(self, text: str) -> Dict[str, Any]:
+    def _generated_document_meta(self, text: str, page_count: int = 1) -> Dict[str, Any]:
         """Extraction metadata a parser would report for the document we build.
 
         It is a single-column text export, so it parses cleanly by construction.
@@ -256,7 +299,7 @@ class OptimizationEngine:
         return {
             "method": "pdf_text",
             "file_type": "docx",
-            "page_count": 1,
+            "page_count": max(1, page_count),
             "char_count": len(text),
             "used_ocr": False,
             "warnings": [],

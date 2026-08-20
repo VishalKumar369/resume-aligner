@@ -1,13 +1,15 @@
 import { fireEvent, render, screen, waitFor } from "@testing-library/react";
-import { describe, expect, it, vi } from "vitest";
+import userEvent from "@testing-library/user-event";
+import { beforeEach, describe, expect, it, vi } from "vitest";
 
 import UploadPage from "@/app/upload/page";
+import { alignmentService, jdService, resumeService } from "@/services/api";
 
 // The page pulls in the api service (and axios). Nothing here reaches the
-// network — we only exercise the client-side dropzone validation — but the
-// service is stubbed so an accidental call can't hit a real host.
+// network — the service is stubbed so tests drive the flow with canned
+// responses and an accidental call can't hit a real host.
 vi.mock("@/services/api", () => ({
-    resumeService: { upload: vi.fn(), download: vi.fn() },
+    resumeService: { upload: vi.fn(), optimize: vi.fn(), download: vi.fn() },
     jdService: { upload: vi.fn() },
     alignmentService: { generate: vi.fn() },
     dashboardService: { getSummary: vi.fn() },
@@ -77,5 +79,111 @@ describe("UploadPage — unsupported file handling", () => {
 
         await waitFor(() => expect(screen.queryByText(/can't read \.png files/i)).toBeNull());
         expect(screen.getByText("resume.pdf")).toBeInTheDocument();
+    });
+});
+
+describe("UploadPage — single vs multi page length", () => {
+    const alignment = {
+        alignment_score: 60,
+        ats_score: 55,
+        breakdown: {},
+        feedback: "Reasonable match.",
+        matched_skills: [],
+        partial_skills: [],
+        missing_skills: [],
+    };
+
+    const optimization = (overrides: Record<string, any> = {}) => ({
+        label: "v1 — Acme",
+        baseline_ats_score: 55,
+        ats_score: 60,
+        ats_delta: 5,
+        baseline_alignment_score: 55,
+        alignment_score: 60,
+        alignment_delta: 5,
+        changes: [],
+        suggestions: [],
+        blocked_rewrites: [],
+        single_page: true,
+        page_count: 1,
+        trimmed_bullets: 2,
+        single_page_fit: true,
+        length_note: "Condensed to a single page by trimming 2 lower-impact bullet(s).",
+        ...overrides,
+    });
+
+    beforeEach(() => {
+        vi.mocked(resumeService.upload).mockResolvedValue({
+            data: { id: "r-1", structured_data: { personal_info: { name: "Ada" } }, extraction_meta: {} },
+        } as any);
+        vi.mocked(jdService.upload).mockResolvedValue({ data: { id: "j-1" } } as any);
+        vi.mocked(alignmentService.generate).mockResolvedValue({ data: alignment } as any);
+        vi.mocked(resumeService.optimize).mockResolvedValue({ data: optimization() } as any);
+    });
+
+    const clickPrimary = async (name: RegExp) =>
+        userEvent.click(await screen.findByRole("button", { name }));
+
+    /** Upload → parse → continue → JD → alignment, landing on step 3. */
+    const advanceToAlignment = async () => {
+        render(<UploadPage />);
+        selectFile(pdf("resume.pdf"));
+        await clickPrimary(/Upload & Parse/i);
+        await clickPrimary(/Continue/i);
+
+        const textarea = document.querySelector("textarea") as HTMLTextAreaElement;
+        fireEvent.change(textarea, { target: { value: "We need a Python and FastAPI engineer." } });
+
+        await clickPrimary(/Analyze Alignment/i);
+        await screen.findByRole("heading", { name: "Alignment" });
+    };
+
+    it("offers a single/multi page choice on the alignment step", async () => {
+        await advanceToAlignment();
+
+        expect(screen.getByText("Optimized resume length")).toBeInTheDocument();
+        expect(screen.getByRole("button", { name: /Single page/i })).toHaveAttribute("aria-pressed", "true");
+        expect(screen.getByRole("button", { name: /Multiple pages/i })).toHaveAttribute("aria-pressed", "false");
+    });
+
+    it("optimizes as single page by default", async () => {
+        await advanceToAlignment();
+
+        await clickPrimary(/Optimize Resume/i);
+
+        expect(resumeService.optimize).toHaveBeenCalledWith("r-1", "j-1", { pagePreference: "single" });
+    });
+
+    it("switches to multi page when the user picks it", async () => {
+        await advanceToAlignment();
+
+        await userEvent.click(screen.getByRole("button", { name: /Multiple pages/i }));
+        expect(screen.getByRole("button", { name: /Multiple pages/i })).toHaveAttribute("aria-pressed", "true");
+
+        await clickPrimary(/Optimize Resume/i);
+
+        expect(resumeService.optimize).toHaveBeenCalledWith("r-1", "j-1", { pagePreference: "multi" });
+    });
+
+    it("reports what condensing did on the result step", async () => {
+        await advanceToAlignment();
+        await clickPrimary(/Optimize Resume/i);
+
+        expect(await screen.findByText(/Condensed to a single page by trimming 2/i)).toBeInTheDocument();
+    });
+
+    it("warns honestly on the rare resume that still overflows after condensing", async () => {
+        vi.mocked(resumeService.optimize).mockResolvedValue({
+            data: optimization({
+                single_page_fit: false,
+                page_count: 2,
+                length_note: "Even after condensing, the core content still needs 2 pages. Every section was kept because cutting more would remove work history or education.",
+            }),
+        } as any);
+
+        await advanceToAlignment();
+        await clickPrimary(/Optimize Resume/i);
+
+        expect(await screen.findByText(/still needs 2 pages/i)).toBeInTheDocument();
     });
 });

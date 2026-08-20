@@ -6,7 +6,7 @@ import { useDropzone, type FileRejection } from "react-dropzone";
 import { useRouter } from "next/navigation";
 import {
     Upload, FileText, CheckCircle, Loader2, Link as LinkIcon, Sparkles,
-    ShieldCheck, Download, AlertTriangle,
+    ShieldCheck, Download, AlertTriangle, FileStack,
 } from "lucide-react";
 import { cn } from "@/lib/utils";
 import { resumeService, jdService, alignmentService, dashboardService, apiErrorMessage } from "@/services/api";
@@ -27,6 +27,9 @@ export default function UploadPage() {
     const [uploadedFile, setUploadedFile] = useState<File | null>(null);
     const [jdText, setJdText] = useState("");
     const [jdUrl, setJdUrl] = useState("");
+    // Most resumes should stay to one page, so single is the default. The user
+    // can switch to multi when they have enough relevant content to justify it.
+    const [pagePreference, setPagePreference] = useState<"single" | "multi">("single");
     const [processing, setProcessing] = useState(false);
     const [resume, setResume] = useState<any>(null);
     const [jdId, setJdId] = useState<string | null>(null);
@@ -119,7 +122,7 @@ export default function UploadPage() {
 
         if (currentStep === 3) {
             return run(async () => {
-                const { data } = await resumeService.optimize(resume.id, jdId!);
+                const { data } = await resumeService.optimize(resume.id, jdId!, { pagePreference });
                 setOptimization(data);
                 setCurrentStep(4);
             });
@@ -367,6 +370,50 @@ export default function UploadPage() {
                                         </div>
                                     </div>
                                 )}
+
+                                {/* Length preference — drives the optimizer's condensing. */}
+                                <div className="pt-2 border-t border-border/50">
+                                    <p className="text-xs font-medium text-muted mb-2 inline-flex items-center gap-1.5">
+                                        <FileStack className="w-3.5 h-3.5" /> Optimized resume length
+                                    </p>
+                                    <div className="grid grid-cols-2 gap-3">
+                                        {[
+                                            {
+                                                value: "single" as const,
+                                                title: "Single page",
+                                                detail: "Trims lower-impact bullets to fit one page. Keeps your skills and the most job-relevant content — ATS score is preserved.",
+                                            },
+                                            {
+                                                value: "multi" as const,
+                                                title: "Multiple pages",
+                                                detail: "Keeps everything. Lets the resume run to two or more pages if the content needs it.",
+                                            },
+                                        ].map((option) => {
+                                            const active = pagePreference === option.value;
+                                            return (
+                                                <button
+                                                    key={option.value}
+                                                    type="button"
+                                                    onClick={() => setPagePreference(option.value)}
+                                                    aria-pressed={active}
+                                                    className={cn(
+                                                        "text-left rounded-xl border p-3 transition-colors",
+                                                        active
+                                                            ? "border-primary bg-primary/10"
+                                                            : "border-border bg-surface-2 hover:border-primary/40"
+                                                    )}
+                                                >
+                                                    <span className={cn("text-sm font-semibold", active ? "text-primary" : "text-white")}>
+                                                        {option.title}
+                                                    </span>
+                                                    <span className="block text-[11px] text-muted mt-1 leading-snug">
+                                                        {option.detail}
+                                                    </span>
+                                                </button>
+                                            );
+                                        })}
+                                    </div>
+                                </div>
                             </div>
                         )}
 
@@ -397,6 +444,21 @@ export default function UploadPage() {
                                         </div>
                                     ))}
                                 </div>
+
+                                {optimization.length_note && (
+                                    <div className={cn(
+                                        "border rounded-xl p-3 flex gap-2.5",
+                                        optimization.single_page_fit === false
+                                            ? "bg-warning/5 border-warning/20"
+                                            : "bg-primary/5 border-primary/20"
+                                    )}>
+                                        <FileStack className={cn(
+                                            "w-4 h-4 flex-shrink-0 mt-0.5",
+                                            optimization.single_page_fit === false ? "text-warning" : "text-primary"
+                                        )} />
+                                        <p className="text-xs text-muted">{optimization.length_note}</p>
+                                    </div>
+                                )}
 
                                 {optimization.note && (
                                     <div className="bg-warning/5 border border-warning/20 rounded-xl p-3 flex gap-2.5">

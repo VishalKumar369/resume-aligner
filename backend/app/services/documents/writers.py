@@ -3,12 +3,66 @@
 All three render the same block list from `layout`, so they cannot drift.
 Deliberately single column with no tables or graphics: that is what resume
 parsers read reliably, and what the ATS `structural_safety` component rewards.
+
+The .docx and the PDF share one page geometry and one typography spec (`STYLE`
+below), and the .docx uses *exact* line spacing, so a line is the same height in
+Word as it is in the PDF regardless of the installed font. That is what lets the
+single-page condenser measure the PDF once and trust that the .docx fits too.
 """
 
+from dataclasses import dataclass
 from io import BytesIO
-from typing import Any, Dict, List
+from typing import Any, Dict, List, Optional, Tuple
 
-from app.services.documents.layout import Block, BlockKind, build_blocks
+from app.services.documents.layout import BlockKind, build_blocks
+
+# --------------------------------------------------------------- shared layout
+
+# US Letter, in points (72pt = 1 inch). Both exporters use these exact values.
+PAGE_WIDTH = 612.0
+PAGE_HEIGHT = 792.0
+MARGIN_TOP = 36.0      # 0.5"
+MARGIN_BOTTOM = 36.0   # 0.5"
+MARGIN_LEFT = 43.2     # 0.6"
+MARGIN_RIGHT = 43.2    # 0.6"
+
+# When *measuring* for the single-page condenser we reserve this much extra
+# height, so a .docx that renders a hair taller than the PDF (font substitution,
+# a bullet wrapping one line sooner) still lands on a single page in Word. The
+# real downloaded documents use the full page.
+MEASURE_HEADROOM = 40.0  # ~0.55"
+
+
+@dataclass(frozen=True)
+class BlockStyle:
+    size: float
+    leading: float
+    space_before: float = 0.0
+    space_after: float = 0.0
+    bold: bool = False
+    italic: bool = False
+    center: bool = False
+    color: Optional[str] = None  # "#RRGGBB"
+
+
+# One typography definition consumed by both exporters. Change it here and the
+# .docx and the PDF move together.
+STYLE: Dict[BlockKind, BlockStyle] = {
+    BlockKind.NAME: BlockStyle(18, 21, space_after=2, bold=True, center=True),
+    BlockKind.CONTACT: BlockStyle(8.5, 11, space_after=2, center=True, color="#444444"),
+    BlockKind.HEADING: BlockStyle(11, 13, space_before=10, space_after=3, bold=True),
+    BlockKind.SUBHEADING: BlockStyle(10, 12, bold=True),
+    BlockKind.META: BlockStyle(8.5, 10, space_after=2, italic=True, color="#555555"),
+    BlockKind.PARAGRAPH: BlockStyle(9.5, 12, space_after=2),
+    BlockKind.BULLET: BlockStyle(9.5, 12, space_after=2),
+}
+
+
+def _style_for(kind: BlockKind) -> BlockStyle:
+    return STYLE.get(kind, STYLE[BlockKind.PARAGRAPH])
+
+
+# ------------------------------------------------------------------- plain text
 
 
 def render_text(resume_data: Dict[str, Any]) -> str:
@@ -24,99 +78,113 @@ def render_text(resume_data: Dict[str, Any]) -> str:
     return "\n".join(lines).strip()
 
 
+# ------------------------------------------------------------------------- docx
+
+
 def render_docx(resume_data: Dict[str, Any]) -> bytes:
     import docx
-    from docx.enum.text import WD_ALIGN_PARAGRAPH
+    from docx.enum.text import WD_ALIGN_PARAGRAPH, WD_LINE_SPACING
     from docx.shared import Pt, RGBColor
+
+    def _rgb(hex_color: str) -> "RGBColor":
+        return RGBColor(int(hex_color[1:3], 16), int(hex_color[3:5], 16), int(hex_color[5:7], 16))
 
     document = docx.Document()
 
     for section in document.sections:
-        section.top_margin = section.bottom_margin = Pt(36)
-        section.left_margin = section.right_margin = Pt(45)
+        section.page_width = Pt(PAGE_WIDTH)
+        section.page_height = Pt(PAGE_HEIGHT)
+        section.top_margin = Pt(MARGIN_TOP)
+        section.bottom_margin = Pt(MARGIN_BOTTOM)
+        section.left_margin = Pt(MARGIN_LEFT)
+        section.right_margin = Pt(MARGIN_RIGHT)
 
+    # Arial is metrically close to the PDF's Helvetica, so line wrapping matches.
+    # Zero the template's default paragraph spacing so nothing inherits Word's
+    # 8pt-after, which would make the document run longer than the PDF.
     normal = document.styles["Normal"]
-    normal.font.name = "Calibri"
-    normal.font.size = Pt(10)
+    normal.font.name = "Arial"
+    normal.font.size = Pt(STYLE[BlockKind.PARAGRAPH].size)
+    normal.paragraph_format.space_before = Pt(0)
+    normal.paragraph_format.space_after = Pt(0)
 
     for block in build_blocks(resume_data):
-        if block.kind is BlockKind.NAME:
-            paragraph = document.add_paragraph()
-            paragraph.alignment = WD_ALIGN_PARAGRAPH.CENTER
-            run = paragraph.add_run(block.text)
-            run.bold = True
-            run.font.size = Pt(18)
+        spec = _style_for(block.kind)
 
-        elif block.kind is BlockKind.CONTACT:
-            paragraph = document.add_paragraph()
-            paragraph.alignment = WD_ALIGN_PARAGRAPH.CENTER
-            run = paragraph.add_run(block.text)
-            run.font.size = Pt(9)
-            run.font.color.rgb = RGBColor(0x44, 0x44, 0x44)
-
-        elif block.kind is BlockKind.HEADING:
-            paragraph = document.add_paragraph()
-            paragraph.paragraph_format.space_before = Pt(10)
-            paragraph.paragraph_format.space_after = Pt(2)
-            run = paragraph.add_run(block.text)
-            run.bold = True
-            run.font.size = Pt(11)
-
-        elif block.kind is BlockKind.SUBHEADING:
-            paragraph = document.add_paragraph()
-            paragraph.paragraph_format.space_after = Pt(0)
-            run = paragraph.add_run(block.text)
-            run.bold = True
-
-        elif block.kind is BlockKind.META:
-            paragraph = document.add_paragraph()
-            paragraph.paragraph_format.space_after = Pt(2)
-            run = paragraph.add_run(block.text)
-            run.italic = True
-            run.font.size = Pt(9)
-            run.font.color.rgb = RGBColor(0x55, 0x55, 0x55)
-
-        elif block.kind is BlockKind.BULLET:
-            # A real list style, so parsers see list semantics rather than a
-            # hand-typed dash.
+        if block.kind is BlockKind.BULLET:
+            # A real list style keeps list semantics for parsers; its spacing is
+            # overridden below so its height matches the PDF's bullets.
             paragraph = document.add_paragraph(block.text, style="List Bullet")
-            paragraph.paragraph_format.space_after = Pt(1)
-
         else:
-            document.add_paragraph(block.text)
+            paragraph = document.add_paragraph()
+            paragraph.add_run(block.text)
+
+        for run in paragraph.runs:
+            run.font.name = "Arial"
+            run.font.size = Pt(spec.size)
+            run.bold = spec.bold
+            run.italic = spec.italic
+            if spec.color:
+                run.font.color.rgb = _rgb(spec.color)
+
+        fmt = paragraph.paragraph_format
+        fmt.space_before = Pt(spec.space_before)
+        fmt.space_after = Pt(spec.space_after)
+        # EXACTLY makes each line exactly `leading` points tall, so vertical
+        # height is deterministic and equal to the PDF's leading.
+        fmt.line_spacing = Pt(spec.leading)
+        fmt.line_spacing_rule = WD_LINE_SPACING.EXACTLY
+        if spec.center:
+            paragraph.alignment = WD_ALIGN_PARAGRAPH.CENTER
 
     buffer = BytesIO()
     document.save(buffer)
     return buffer.getvalue()
 
 
+# -------------------------------------------------------------------------- pdf
+
+
 def render_pdf(resume_data: Dict[str, Any]) -> bytes:
+    payload, _pages = render_pdf_with_page_count(resume_data)
+    return payload
+
+
+def render_pdf_with_page_count(
+    resume_data: Dict[str, Any], measure_headroom: float = 0.0
+) -> Tuple[bytes, int]:
+    """Render the PDF and report how many pages it occupies.
+
+    `measure_headroom` shrinks the usable page height for the page-count only
+    (see `MEASURE_HEADROOM`); the returned bytes are always a full-page render.
+    """
     from reportlab.lib.enums import TA_CENTER
-    from reportlab.lib.pagesizes import LETTER
     from reportlab.lib.styles import ParagraphStyle, getSampleStyleSheet
-    from reportlab.lib.units import inch
     from reportlab.platypus import ListFlowable, ListItem, Paragraph, SimpleDocTemplate, Spacer
 
     base = getSampleStyleSheet()["Normal"]
-    styles = {
-        "name": ParagraphStyle("name", parent=base, fontName="Helvetica-Bold",
-                               fontSize=18, leading=21, alignment=TA_CENTER, spaceAfter=2),
-        "contact": ParagraphStyle("contact", parent=base, fontSize=8.5, leading=11,
-                                  alignment=TA_CENTER, textColor="#444444", spaceAfter=2),
-        "heading": ParagraphStyle("heading", parent=base, fontName="Helvetica-Bold",
-                                  fontSize=11, leading=13, spaceBefore=10, spaceAfter=3),
-        "subheading": ParagraphStyle("subheading", parent=base, fontName="Helvetica-Bold",
-                                     fontSize=10, leading=12, spaceAfter=0),
-        "meta": ParagraphStyle("meta", parent=base, fontName="Helvetica-Oblique",
-                               fontSize=8.5, leading=10, textColor="#555555", spaceAfter=2),
-        "body": ParagraphStyle("body", parent=base, fontSize=9.5, leading=12, spaceAfter=2),
-    }
+
+    def _para_style(kind: BlockKind) -> ParagraphStyle:
+        spec = _style_for(kind)
+        font = "Helvetica-Bold" if spec.bold else "Helvetica-Oblique" if spec.italic else "Helvetica"
+        style = ParagraphStyle(
+            kind.value, parent=base, fontName=font,
+            fontSize=spec.size, leading=spec.leading,
+            spaceBefore=spec.space_before, spaceAfter=spec.space_after,
+        )
+        if spec.center:
+            style.alignment = TA_CENTER
+        if spec.color:
+            style.textColor = spec.color
+        return style
+
+    styles = {kind: _para_style(kind) for kind in STYLE}
 
     buffer = BytesIO()
     document = SimpleDocTemplate(
-        buffer, pagesize=LETTER,
-        leftMargin=0.6 * inch, rightMargin=0.6 * inch,
-        topMargin=0.5 * inch, bottomMargin=0.5 * inch,
+        buffer, pagesize=(PAGE_WIDTH, PAGE_HEIGHT),
+        leftMargin=MARGIN_LEFT, rightMargin=MARGIN_RIGHT,
+        topMargin=MARGIN_TOP, bottomMargin=MARGIN_BOTTOM + measure_headroom,
         title=str((resume_data.get("personal_info") or {}).get("name") or "Resume"),
     )
 
@@ -133,25 +201,26 @@ def render_pdf(resume_data: Dict[str, Any]) -> bytes:
 
     for block in build_blocks(resume_data):
         if block.kind is BlockKind.BULLET:
-            bullets.append(ListItem(Paragraph(_escape(block.text), styles["body"]), leftIndent=12))
+            bullets.append(ListItem(Paragraph(_escape(block.text), styles[BlockKind.BULLET]), leftIndent=12))
             continue
 
         flush_bullets()
-        style_name = {
-            BlockKind.NAME: "name",
-            BlockKind.CONTACT: "contact",
-            BlockKind.HEADING: "heading",
-            BlockKind.SUBHEADING: "subheading",
-            BlockKind.META: "meta",
-        }.get(block.kind, "body")
-        story.append(Paragraph(_escape(block.text), styles[style_name]))
+        story.append(Paragraph(_escape(block.text), styles.get(block.kind, styles[BlockKind.PARAGRAPH])))
 
     flush_bullets()
     if not story:
         story.append(Spacer(1, 1))
 
     document.build(story)
-    return buffer.getvalue()
+    # reportlab increments `page` on every page break, so after build it holds
+    # the total page count.
+    return buffer.getvalue(), max(1, int(getattr(document, "page", 1)))
+
+
+def count_pdf_pages(resume_data: Dict[str, Any], headroom: float = MEASURE_HEADROOM) -> int:
+    """Pages the resume occupies (>= 1), with a safety headroom so the number is
+    a floor the .docx honours too. Pass headroom=0 for the raw PDF page count."""
+    return render_pdf_with_page_count(resume_data, measure_headroom=headroom)[1]
 
 
 def _escape(text: str) -> str:

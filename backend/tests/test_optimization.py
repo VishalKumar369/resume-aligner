@@ -319,6 +319,69 @@ class TestOptimizationEngine:
         assert "Kubernetes" not in result.optimized_data["experience"][0]["highlights"][0]
 
 
+class TestSinglePageOptimization:
+    def _long_resume(self):
+        # One role with many low-value bullets, guaranteed to overflow a page.
+        highlights = [
+            f"Handled routine task number {i} for the team, including coordination, "
+            "reporting, and documentation across several internal systems."
+            for i in range(40)
+        ]
+        return resume(experience=[{
+            "company": "Globex", "role": "Backend Engineer",
+            "start_date": "2021-01", "end_date": "present",
+            "highlights": highlights,
+        }])
+
+    @pytest.mark.asyncio
+    async def test_single_page_request_trims_to_one_page(self):
+        result = await OptimizationEngine(use_llm=False).optimize(
+            self._long_resume(), jd(), single_page=True,
+        )
+
+        assert result.single_page is True
+        assert result.page_count == 1
+        assert result.single_page_fit is True
+        assert result.trimmed_bullets > 0
+        assert any(c["type"] == "condensed_single_page" for c in result.changes)
+
+    @pytest.mark.asyncio
+    async def test_multi_page_request_leaves_content_alone(self):
+        long_resume = self._long_resume()
+        result = await OptimizationEngine(use_llm=False).optimize(
+            long_resume, jd(), single_page=False,
+        )
+
+        assert result.single_page is False
+        assert result.trimmed_bullets == 0
+        kept = result.optimized_data["experience"][0]["highlights"]
+        assert len(kept) == len(long_resume["experience"][0]["highlights"])
+
+    @pytest.mark.asyncio
+    async def test_condensing_keeps_the_bullet_floor_per_role(self):
+        result = await OptimizationEngine(use_llm=False).optimize(
+            self._long_resume(), jd(), single_page=True,
+        )
+
+        for entry in result.optimized_data["experience"]:
+            assert len(entry.get("highlights") or []) >= 3
+
+    @pytest.mark.asyncio
+    async def test_condensing_preserves_the_jd_relevant_bullets(self):
+        # A relevant bullet mixed into a pile of filler must survive the trim.
+        data = resume(experience=[{
+            "company": "Globex", "role": "Backend Engineer",
+            "highlights": (
+                ["Built FastAPI services on Docker handling Python workloads."]
+                + [f"Did miscellaneous filler task {i} with no relevance." for i in range(30)]
+            ),
+        }])
+        result = await OptimizationEngine(use_llm=False).optimize(data, jd(), single_page=True)
+
+        kept = " ".join(result.optimized_data["experience"][0]["highlights"])
+        assert "FastAPI" in kept and "Docker" in kept
+
+
 class TestDocumentWriters:
     def test_layout_uses_standard_single_column_sections(self):
         kinds = [block.kind for block in build_blocks(resume())]
@@ -345,6 +408,20 @@ class TestDocumentWriters:
         assert payload.startswith(b"%PDF-")
         assert len(payload) > 1000
 
+    def test_reports_page_count_alongside_the_pdf(self):
+        from app.services.documents.writers import count_pdf_pages, render_pdf_with_page_count
+
+        payload, pages = render_pdf_with_page_count(resume())
+        assert payload.startswith(b"%PDF-")
+        assert pages == 1
+        assert count_pdf_pages(resume()) == 1
+
+        overflow = resume(experience=[{
+            "company": "Globex", "role": "Engineer",
+            "highlights": [f"Did substantial thing number {i} with detail." for i in range(60)],
+        }])
+        assert count_pdf_pages(overflow) > 1
+
     def test_generated_docx_reads_back_through_the_extraction_pipeline(self):
         # The whole point of generating a clean document is that a parser can
         # read it. Round-tripping proves it.
@@ -367,3 +444,65 @@ class TestDocumentWriters:
         sparse = {"schema_version": "1.0", "personal_info": {"name": "Sam"}}
         assert render_docx(sparse)[:2] == b"PK"
         assert render_pdf(sparse).startswith(b"%PDF-")
+
+
+class TestDocxMatchesPdfLayout:
+    """The .docx must paginate like the PDF, so the single-page guarantee holds
+    for both. That means the same page geometry and deterministic line heights."""
+
+    def _document(self):
+        from io import BytesIO
+
+        import docx
+
+        return docx.Document(BytesIO(render_docx(resume())))
+
+    def test_uses_the_shared_page_geometry(self):
+        from docx.shared import Pt
+
+        from app.services.documents import writers
+
+        section = self._document().sections[0]
+        assert section.page_width == Pt(writers.PAGE_WIDTH)
+        assert section.page_height == Pt(writers.PAGE_HEIGHT)
+        assert section.top_margin == Pt(writers.MARGIN_TOP)
+        assert section.bottom_margin == Pt(writers.MARGIN_BOTTOM)
+        assert section.left_margin == Pt(writers.MARGIN_LEFT)
+        assert section.right_margin == Pt(writers.MARGIN_RIGHT)
+
+    def test_every_paragraph_uses_exact_line_spacing(self):
+        from docx.enum.text import WD_LINE_SPACING
+
+        # EXACTLY is what makes a line the same height in Word as in the PDF,
+        # independent of the installed font.
+        paragraphs = [p for p in self._document().paragraphs if p.text.strip()]
+        assert paragraphs
+        for paragraph in paragraphs:
+            assert paragraph.paragraph_format.line_spacing_rule is WD_LINE_SPACING.EXACTLY
+
+    def test_default_paragraph_spacing_is_zeroed(self):
+        from docx.shared import Pt
+
+        # Word's template adds 8pt after every paragraph by default, which would
+        # make the .docx run longer than the PDF. It must be cleared.
+        normal = self._document().styles["Normal"]
+        assert normal.paragraph_format.space_after == Pt(0)
+
+    def test_measurement_reserves_headroom_for_the_docx(self):
+        from app.services.documents.writers import (
+            MEASURE_HEADROOM,
+            count_pdf_pages,
+            render_pdf_with_page_count,
+        )
+
+        # The condenser's default counter reserves headroom; the raw render does
+        # not. On a page filled to just past the headroom line, the two disagree
+        # - which is exactly the safety margin that protects the .docx.
+        assert MEASURE_HEADROOM > 0
+        filler = resume(experience=[{
+            "company": "Globex", "role": "Engineer",
+            "highlights": [f"Delivered feature {i} with monitoring and docs." for i in range(34)],
+        }])
+        _, raw_pages = render_pdf_with_page_count(filler, measure_headroom=0.0)
+        measured = count_pdf_pages(filler)
+        assert measured >= raw_pages
