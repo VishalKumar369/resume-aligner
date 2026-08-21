@@ -25,7 +25,9 @@ const navItems = [
         ],
     },
     { href: "/learning", icon: BookOpen, label: "Learning Roadmap" },
-    { href: "/company/google", icon: Building2, label: "Company Intel" },
+    // href is a demo landing; `match` keeps the tab active on any company route,
+    // including the per-analysis insights pages (/company/<slug>?jd=...).
+    { href: "/company/google", match: "/company", icon: Building2, label: "Company Intel" },
     { href: "/settings", icon: Settings, label: "Settings" },
 ];
 
@@ -115,10 +117,13 @@ export function Sidebar() {
     );
 }
 
-interface NavItem { href: string; icon: React.ElementType; label: string }
+interface NavItem { href: string; icon: React.ElementType; label: string; match?: string }
 
 function NavLink({ item, collapsed, pathname }: { item: NavItem; collapsed: boolean; pathname: string }) {
-    const isActive = pathname === item.href || (item.href !== "/dashboard" && pathname.startsWith(item.href));
+    // `match` lets a link stay active across a whole section even when its href
+    // points at one page within it (e.g. Company Intel → any /company route).
+    const activePrefix = item.match || item.href;
+    const isActive = pathname === item.href || (activePrefix !== "/dashboard" && pathname.startsWith(activePrefix));
     return (
         <Link href={item.href}>
             <div

@@ -57,6 +57,14 @@ describe("Sidebar", () => {
         expect(navRow("Company Intel")).toHaveClass("text-primary");
     });
 
+    it("keeps Company Intel active on any company route, not just the demo one", () => {
+        // Arriving from an analysis's Insights link lands on a different slug.
+        setPathname("/company/at-t-inc");
+        render(<Sidebar />);
+
+        expect(navRow("Company Intel")).toHaveClass("text-primary");
+    });
+
     it("hides the labels once collapsed", async () => {
         render(<Sidebar />);
 
