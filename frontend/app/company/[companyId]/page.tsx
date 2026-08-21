@@ -4,11 +4,11 @@ import { Suspense, useState } from "react";
 import { motion } from "framer-motion";
 import { useParams, useSearchParams } from "next/navigation";
 import {
-    Building2, ExternalLink, Info, Download, FileText, Target, Zap, Layers, Briefcase, Sparkles,
+    Building2, ExternalLink, Info, Download, FileText, Target, Zap, Layers, Briefcase, Sparkles, ArrowRight,
 } from "lucide-react";
 import Link from "next/link";
 import { StatCard } from "@/components/ui/StatCard";
-import { EmptyState, ErrorState, PriorityBadge, Skeleton, StatSkeletonRow } from "@/components/ui/States";
+import { EmptyState, ErrorState, PriorityBadge, ScorePill, Skeleton, StatSkeletonRow } from "@/components/ui/States";
 import { useApi } from "@/hooks/useApi";
 import { cn, getScoreColor, formatScore } from "@/lib/utils";
 import { alignmentService, apiErrorMessage, companyService, jdService, resumeService } from "@/services/api";
@@ -91,9 +91,15 @@ function CompanyPageContent() {
         );
     }
 
-    const requirements = (jd?.structured_data?.requirements || {}) as any;
+    const structured = (jd?.structured_data || {}) as any;
+    const requirements = (structured.requirements || {}) as any;
     const mandatory: string[] = requirements.mandatory_skills || [];
     const preferred: string[] = requirements.preferred_skills || [];
+    const qualifications: string[] = requirements.qualifications || [];
+    const responsibilities: string[] = structured.responsibilities || [];
+    const experienceRange = [structured.min_experience_years, structured.max_experience_years].filter(
+        (v) => v !== null && v !== undefined
+    );
     const missing: any[] = alignment?.missing_skills || [];
     const matched: string[] = alignment?.matched_skills || [];
     const tailored = (versions || []).filter((v) => v.jd_id === jdId);
@@ -139,6 +145,54 @@ function CompanyPageContent() {
                             <StatCard title="Experience Match" value={alignment.experience_match_score ?? 0} icon={Briefcase} scoreType delay={0.15} />
                         </div>
                     )}
+
+                    {/* The job description itself, so the role is visible here. */}
+                    <motion.div initial={{ opacity: 0, y: 16 }} animate={{ opacity: 1, y: 0 }}
+                        className="card-elevated rounded-2xl p-6">
+                        <h3 className="text-sm font-semibold mb-3 inline-flex items-center gap-2">
+                            <FileText className="w-4 h-4 text-primary" /> About this role
+                        </h3>
+                        {(structured.employment_type || experienceRange.length > 0 || structured.seniority) && (
+                            <div className="flex flex-wrap gap-2 mb-4 text-xs">
+                                {structured.seniority && (
+                                    <span className="px-2.5 py-1 bg-surface-2 border border-border rounded-lg capitalize">{structured.seniority}</span>
+                                )}
+                                {structured.employment_type && (
+                                    <span className="px-2.5 py-1 bg-surface-2 border border-border rounded-lg">{structured.employment_type}</span>
+                                )}
+                                {experienceRange.length > 0 && (
+                                    <span className="px-2.5 py-1 bg-surface-2 border border-border rounded-lg">
+                                        {experienceRange.join("–")}+ yrs experience
+                                    </span>
+                                )}
+                            </div>
+                        )}
+                        {responsibilities.length > 0 ? (
+                            <ul className="space-y-1.5">
+                                {responsibilities.map((r, i) => (
+                                    <li key={i} className="text-sm text-muted-foreground flex gap-2">
+                                        <span className="text-primary mt-1.5 w-1 h-1 rounded-full bg-primary flex-shrink-0" />
+                                        {r}
+                                    </li>
+                                ))}
+                            </ul>
+                        ) : (
+                            <p className="text-sm text-muted">
+                                No responsibilities were extracted from this posting.
+                                {jd.url && " Open the original posting above for the full description."}
+                            </p>
+                        )}
+                        {qualifications.length > 0 && (
+                            <div className="mt-4 pt-3 border-t border-border/50">
+                                <p className="text-xs font-medium text-muted mb-2">Qualifications</p>
+                                <ul className="space-y-1">
+                                    {qualifications.map((q, i) => (
+                                        <li key={i} className="text-xs text-muted">{q}</li>
+                                    ))}
+                                </ul>
+                            </div>
+                        )}
+                    </motion.div>
 
                     <div className="grid lg:grid-cols-2 gap-6">
                         {/* Tailored resume — the whole point of coming here */}
@@ -316,26 +370,11 @@ function CompanyPageContent() {
                         </motion.div>
                     </div>
 
-                    <div className="card-elevated rounded-2xl overflow-hidden">
-                        <div className="p-5 border-b border-border">
-                            <h3 className="text-sm font-semibold">Saved postings</h3>
-                        </div>
-                        <div className="divide-y divide-border/50">
+                    <div>
+                        <h3 className="text-sm font-semibold mb-3">Saved postings</h3>
+                        <div className="space-y-3">
                             {insights.postings?.map((posting: any) => (
-                                <div key={posting.jd_id} className="p-4 flex items-center justify-between gap-4">
-                                    <div className="min-w-0">
-                                        <p className="text-sm truncate">{posting.title}</p>
-                                        <p className="text-xs text-muted mt-0.5">
-                                            Added {posting.added_at ? new Date(posting.added_at).toLocaleDateString() : "—"}
-                                        </p>
-                                    </div>
-                                    {posting.url && (
-                                        <a href={posting.url} target="_blank" rel="noopener noreferrer"
-                                            className="text-xs text-primary hover:underline inline-flex items-center gap-1 flex-shrink-0">
-                                            Open <ExternalLink className="w-3 h-3" />
-                                        </a>
-                                    )}
-                                </div>
+                                <PostingCard key={posting.jd_id} posting={posting} companyId={companyId} />
                             ))}
                         </div>
                     </div>
@@ -355,6 +394,67 @@ function CompanyPageContent() {
                     </div>
                 )
             )}
+        </div>
+    );
+}
+
+/**
+ * One saved posting with its own details — role, requirements, and your latest
+ * match — and a link into the full analysis (with the tailored resume).
+ */
+function PostingCard({ posting, companyId }: { posting: any; companyId: string }) {
+    const params = new URLSearchParams({ jd: posting.jd_id });
+    if (posting.resume_id) params.set("resume", posting.resume_id);
+    if (posting.alignment_id) params.set("alignment", posting.alignment_id);
+    const href = `/company/${companyId}?${params.toString()}`;
+
+    const meta = [posting.seniority, posting.location, posting.work_mode].filter(Boolean).join(" · ");
+    const mandatory: string[] = posting.mandatory_skills || [];
+    const preferred: string[] = posting.preferred_skills || [];
+    const analyzed = posting.your_alignment !== null && posting.your_alignment !== undefined;
+
+    return (
+        <div className="card-elevated rounded-2xl p-5">
+            <div className="flex items-start justify-between gap-4 flex-wrap">
+                <div className="min-w-0">
+                    <p className="font-medium truncate">{posting.title}</p>
+                    <p className="text-xs text-muted mt-0.5">
+                        {[meta, posting.added_at && `added ${new Date(posting.added_at).toLocaleDateString()}`]
+                            .filter(Boolean).join(" · ") || "—"}
+                    </p>
+                </div>
+                {analyzed ? (
+                    <div className="text-right flex-shrink-0">
+                        <ScorePill score={posting.your_alignment} />
+                        <p className="text-[11px] text-muted mt-1">your match</p>
+                    </div>
+                ) : (
+                    <span className="text-[11px] text-muted flex-shrink-0">Not analyzed yet</span>
+                )}
+            </div>
+
+            {(mandatory.length > 0 || preferred.length > 0) && (
+                <div className="mt-3 flex flex-wrap gap-1.5">
+                    {mandatory.map((s) => (
+                        <span key={s} className="px-2 py-0.5 bg-surface-2 border border-border rounded-md text-[11px]">{s}</span>
+                    ))}
+                    {preferred.map((s) => (
+                        <span key={`p-${s}`} className="px-2 py-0.5 bg-surface/40 border border-border/50 rounded-md text-[11px] text-muted">{s}</span>
+                    ))}
+                </div>
+            )}
+
+            <div className="mt-4 flex items-center gap-4">
+                <Link href={href} className="text-xs text-primary hover:underline inline-flex items-center gap-1">
+                    View full analysis <ArrowRight className="w-3 h-3" />
+                </Link>
+                {posting.url && (
+                    <a href={posting.url} target="_blank" rel="noopener noreferrer"
+                        className="text-xs text-muted hover:text-white inline-flex items-center gap-1">
+                        Open posting <ExternalLink className="w-3 h-3" />
+                    </a>
+                )}
+            </div>
         </div>
     );
 }

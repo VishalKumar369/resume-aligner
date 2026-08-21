@@ -25,9 +25,9 @@ const navItems = [
         ],
     },
     { href: "/learning", icon: BookOpen, label: "Learning Roadmap" },
-    // href is a demo landing; `match` keeps the tab active on any company route,
-    // including the per-analysis insights pages (/company/<slug>?jd=...).
-    { href: "/company/google", match: "/company", icon: Building2, label: "Company Intel" },
+    // The index lists every company; `match` also keeps the tab active on the
+    // per-analysis insight pages (/company/<slug>?jd=...).
+    { href: "/company", match: "/company", icon: Building2, label: "Company Intel" },
     { href: "/settings", icon: Settings, label: "Settings" },
 ];
 

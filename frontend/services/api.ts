@@ -143,6 +143,7 @@ export const learningService = {
 };
 
 export const companyService = {
+    getAll: () => api.get("/company/list"),
     getInsights: (companyId: string) => api.get(`/company/${encodeURIComponent(companyId)}/insights`),
 };
 
