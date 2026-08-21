@@ -30,7 +30,13 @@ const jd = {
     url: "https://jobs.acme.test/be",
     structured_data: {
         seniority: "senior",
-        requirements: { mandatory_skills: ["Python", "FastAPI"], preferred_skills: ["Kafka"] },
+        employment_type: "Full-time",
+        min_experience_years: 4,
+        responsibilities: ["Design and own backend services", "Mentor other engineers"],
+        requirements: {
+            mandatory_skills: ["Python", "FastAPI"], preferred_skills: ["Kafka"],
+            qualifications: ["B.Tech in Computer Science"],
+        },
     },
 };
 
@@ -75,6 +81,16 @@ describe("CompanyPage — analysis spotlight", () => {
         // Requirements from the JD.
         expect(screen.getByText("What this role asks for")).toBeInTheDocument();
         expect(screen.getByText("Kafka")).toBeInTheDocument();
+    });
+
+    it("makes the job description itself visible", async () => {
+        render(<CompanyPage />);
+
+        expect(await screen.findByText("About this role")).toBeInTheDocument();
+        expect(screen.getByText("Design and own backend services")).toBeInTheDocument();
+        expect(screen.getByText("Mentor other engineers")).toBeInTheDocument();
+        expect(screen.getByText("B.Tech in Computer Science")).toBeInTheDocument();
+        expect(screen.getByText(/4\+ yrs experience/)).toBeInTheDocument();
     });
 
     it("surfaces this role's gaps and matched skills", async () => {
@@ -123,6 +139,13 @@ describe("CompanyPage — analysis spotlight", () => {
 });
 
 describe("CompanyPage — aggregate view (no analysis scope)", () => {
+    const posting = {
+        jd_id: "jd-1", title: "Backend Engineer", url: "https://acme.test/be",
+        added_at: "2026-08-01T00:00:00Z", seniority: "senior", location: "Remote", work_mode: "hybrid",
+        mandatory_skills: ["Python", "FastAPI"], preferred_skills: ["Kafka"],
+        your_alignment: 78, your_ats: 60, resume_id: "r-1", alignment_id: "al-1",
+    };
+
     beforeEach(() => {
         mockParams = { companyId: "acme" };
         mockSearch = new URLSearchParams();
@@ -130,7 +153,7 @@ describe("CompanyPage — aggregate view (no analysis scope)", () => {
             data: {
                 company: "Acme", jd_count: 2, roles: ["Backend"], locations: [], work_modes: [],
                 demanded_skills: ["Python"], preferred_skills: [], your_best_alignment: 70,
-                your_average_alignment: 65, your_gaps_here: [], postings: [],
+                your_average_alignment: 65, your_gaps_here: [], postings: [posting],
                 source: "Derived from the job descriptions you saved for this company.",
             },
         } as any);
@@ -142,5 +165,45 @@ describe("CompanyPage — aggregate view (no analysis scope)", () => {
         expect(await screen.findByRole("heading", { name: "Acme" })).toBeInTheDocument();
         expect(screen.getByText("What their postings ask for")).toBeInTheDocument();
         expect(jdService.getById).not.toHaveBeenCalled();
+    });
+
+    it("shows each posting's role, requirements, and your match", async () => {
+        render(<CompanyPage />);
+        await screen.findByRole("heading", { name: "Acme" });
+
+        expect(screen.getByText("Backend Engineer")).toBeInTheDocument();
+        expect(screen.getByText("FastAPI")).toBeInTheDocument();
+        expect(screen.getByText("Kafka")).toBeInTheDocument();
+        expect(screen.getByText("78%")).toBeInTheDocument();
+    });
+
+    it("links each posting into its full analysis view", async () => {
+        render(<CompanyPage />);
+        await screen.findByRole("heading", { name: "Acme" });
+
+        expect(screen.getByRole("link", { name: /View full analysis/i })).toHaveAttribute(
+            "href",
+            "/company/acme?jd=jd-1&resume=r-1&alignment=al-1"
+        );
+    });
+
+    it("marks a posting that has never been analyzed", async () => {
+        vi.mocked(companyService.getInsights).mockResolvedValue({
+            data: {
+                company: "Acme", jd_count: 1, roles: [], locations: [], work_modes: [],
+                demanded_skills: [], preferred_skills: [], your_best_alignment: null,
+                your_average_alignment: null, your_gaps_here: [],
+                postings: [{ jd_id: "jd-2", title: "New Role", your_alignment: null, resume_id: null, alignment_id: null, mandatory_skills: [], preferred_skills: [] }],
+                source: "x",
+            },
+        } as any);
+        render(<CompanyPage />);
+
+        expect(await screen.findByText("Not analyzed yet")).toBeInTheDocument();
+        // Still links, with just the JD id.
+        expect(screen.getByRole("link", { name: /View full analysis/i })).toHaveAttribute(
+            "href",
+            "/company/acme?jd=jd-2"
+        );
     });
 });
