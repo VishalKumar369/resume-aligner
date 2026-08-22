@@ -17,6 +17,11 @@ class JDUploadSchema(BaseModel):
     url: Optional[str] = None
     raw_text: Optional[str] = None
 
+class JDUpdateSchema(BaseModel):
+    """User corrections to the parsed role/company, from the verify step."""
+    title: Optional[str] = None
+    company_name: Optional[str] = None
+
 class JDOut(JDBase):
     id: UUID
     owner_id: UUID

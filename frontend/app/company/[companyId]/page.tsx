@@ -4,7 +4,7 @@ import { Suspense, useState } from "react";
 import { motion } from "framer-motion";
 import { useParams, useSearchParams } from "next/navigation";
 import {
-    Building2, ExternalLink, Info, Download, FileText, Target, Zap, Layers, Briefcase, Sparkles, ArrowRight,
+    Building2, ExternalLink, Info, Download, FileText, Target, Zap, Layers, Briefcase, Sparkles, ArrowRight, Pencil,
 } from "lucide-react";
 import Link from "next/link";
 import { StatCard } from "@/components/ui/StatCard";
@@ -37,7 +37,7 @@ function CompanyPageContent() {
     const { data: insights, loading: insightsLoading, error: insightsError, reload } =
         useApi<any>(() => companyService.getInsights(companyId), [companyId]);
 
-    const { data: jd, loading: jdLoading } = useApi<any>(
+    const { data: jd, loading: jdLoading, reload: reloadJd } = useApi<any>(
         () => jdService.getById(jdId!), [jdId], { skip: !jdId });
     const { data: alignment, loading: alignLoading } = useApi<any>(
         () => alignmentService.getById(alignmentId!), [alignmentId], { skip: !alignmentId });
@@ -45,6 +45,41 @@ function CompanyPageContent() {
         () => resumeService.getVersions(resumeId!), [resumeId], { skip: !resumeId });
 
     const [downloadError, setDownloadError] = useState<string | null>(null);
+
+    // Inline edit of this posting's role/company, for postings whose parse
+    // predates the upload verify step.
+    const [editing, setEditing] = useState(false);
+    const [editRole, setEditRole] = useState("");
+    const [editCompany, setEditCompany] = useState("");
+    const [saving, setSaving] = useState(false);
+    const [saveError, setSaveError] = useState<string | null>(null);
+
+    const startEdit = () => {
+        setEditRole(jd?.title && jd.title !== "Untitled role" ? jd.title : "");
+        setEditCompany(jd?.company_name || "");
+        setSaveError(null);
+        setEditing(true);
+    };
+
+    const saveIdentity = async () => {
+        const patch: { title?: string; company_name?: string } = {};
+        if (editRole.trim() && editRole.trim() !== jd.title) patch.title = editRole.trim();
+        if (editCompany.trim() !== (jd.company_name || "")) patch.company_name = editCompany.trim();
+        if (!Object.keys(patch).length) { setEditing(false); return; }
+
+        setSaving(true);
+        setSaveError(null);
+        try {
+            await jdService.update(jdId!, patch);
+            setEditing(false);
+            reloadJd();
+            reload(); // refresh the aggregate company view too
+        } catch (err: any) {
+            setSaveError(apiErrorMessage(err, "Couldn't save"));
+        } finally {
+            setSaving(false);
+        }
+    };
 
     const download = async (versionId: string, filename: string, format: "docx" | "pdf") => {
         setDownloadError(null);
@@ -115,26 +150,60 @@ function CompanyPageContent() {
             {scoped && jd && (
                 <motion.div initial={{ opacity: 0, y: 12 }} animate={{ opacity: 1, y: 0 }} className="space-y-6">
                     <div className="card-elevated rounded-2xl p-6">
-                        <div className="flex items-start justify-between gap-4 flex-wrap">
-                            <div className="flex items-center gap-4 min-w-0">
-                                <div className="w-14 h-14 rounded-2xl bg-primary/10 border border-primary/20 flex items-center justify-center flex-shrink-0">
-                                    <Building2 className="w-7 h-7 text-primary" />
+                        {editing ? (
+                            <div className="space-y-3">
+                                <div className="grid sm:grid-cols-2 gap-3">
+                                    <label className="block">
+                                        <span className="text-xs text-muted mb-1 flex items-center gap-1">
+                                            <Briefcase className="w-3 h-3" /> Role / title
+                                        </span>
+                                        <input className="input-field text-sm" placeholder="e.g. Senior Backend Engineer"
+                                            value={editRole} onChange={(e) => setEditRole(e.target.value)} />
+                                    </label>
+                                    <label className="block">
+                                        <span className="text-xs text-muted mb-1 flex items-center gap-1">
+                                            <Building2 className="w-3 h-3" /> Company
+                                        </span>
+                                        <input className="input-field text-sm" placeholder="e.g. Acme Technologies"
+                                            value={editCompany} onChange={(e) => setEditCompany(e.target.value)} />
+                                    </label>
                                 </div>
-                                <div className="min-w-0">
-                                    <h1 className="text-2xl font-bold truncate">{jd.title || "This role"}</h1>
-                                    <p className="text-sm text-muted mt-1">
-                                        {[jd.company_name, jd.structured_data?.seniority, jd.structured_data?.location, jd.structured_data?.work_mode]
-                                            .filter(Boolean).join(" · ") || "Selected analysis"}
-                                    </p>
+                                {saveError && <p className="text-xs text-error">{saveError}</p>}
+                                <div className="flex gap-2">
+                                    <button onClick={saveIdentity} disabled={saving} className="btn-primary text-sm disabled:opacity-50">
+                                        {saving ? "Saving…" : "Save"}
+                                    </button>
+                                    <button onClick={() => setEditing(false)} className="btn-ghost text-sm">Cancel</button>
                                 </div>
                             </div>
-                            {jd.url && (
-                                <a href={jd.url} target="_blank" rel="noopener noreferrer"
-                                    className="text-xs text-primary hover:underline inline-flex items-center gap-1 flex-shrink-0">
-                                    Open posting <ExternalLink className="w-3 h-3" />
-                                </a>
-                            )}
-                        </div>
+                        ) : (
+                            <div className="flex items-start justify-between gap-4 flex-wrap">
+                                <div className="flex items-center gap-4 min-w-0">
+                                    <div className="w-14 h-14 rounded-2xl bg-primary/10 border border-primary/20 flex items-center justify-center flex-shrink-0">
+                                        <Building2 className="w-7 h-7 text-primary" />
+                                    </div>
+                                    <div className="min-w-0">
+                                        <h1 className="text-2xl font-bold truncate">{jd.title || "This role"}</h1>
+                                        <p className="text-sm text-muted mt-1">
+                                            {[jd.company_name, jd.structured_data?.seniority, jd.structured_data?.location, jd.structured_data?.work_mode]
+                                                .filter(Boolean).join(" · ") || "Selected analysis"}
+                                        </p>
+                                    </div>
+                                </div>
+                                <div className="flex items-center gap-3 flex-shrink-0">
+                                    <button onClick={startEdit}
+                                        className="btn-ghost text-xs inline-flex items-center gap-1.5">
+                                        <Pencil className="w-3.5 h-3.5" /> Edit
+                                    </button>
+                                    {jd.url && (
+                                        <a href={jd.url} target="_blank" rel="noopener noreferrer"
+                                            className="text-xs text-primary hover:underline inline-flex items-center gap-1">
+                                            Open posting <ExternalLink className="w-3 h-3" />
+                                        </a>
+                                    )}
+                                </div>
+                            </div>
+                        )}
                     </div>
 
                     {alignment && (

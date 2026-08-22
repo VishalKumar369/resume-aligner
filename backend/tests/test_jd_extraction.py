@@ -144,11 +144,46 @@ class TestHeuristicJDExtractor:
         assert "Airflow" in parsed.requirements.preferred_skills
         assert "Airflow" not in parsed.requirements.mandatory_skills
 
-    def test_prose_is_not_mistaken_for_a_title_or_company(self):
+    def test_extracts_a_role_from_a_hiring_cue_in_prose(self):
         parsed = HeuristicJDExtractor().extract(UNSTRUCTURED_JD)
 
-        # Every line here is a sentence; guessing would be worse than nothing.
-        assert parsed.role is None
+        # "We need a Data Engineer to join our team in Pune."
+        assert parsed.role == "Data Engineer"
+        # No company is stated in this posting, so none is guessed.
+        assert parsed.company is None
+
+    def test_reads_labelled_role_and_company_lines(self):
+        jd = (
+            "Position: Machine Learning Engineer\n"
+            "Company: Globex Corporation\n\n"
+            "Requirements\n- 3+ years with Python and PyTorch\n"
+        )
+        parsed = HeuristicJDExtractor().extract(jd)
+
+        assert parsed.role == "Machine Learning Engineer"
+        assert parsed.company == "Globex Corporation"
+
+    def test_reads_company_from_a_hiring_sentence(self):
+        jd = (
+            "Acme Labs is hiring engineers to scale our platform.\n\n"
+            "Requirements\n- Strong Python and Go\n"
+        )
+        parsed = HeuristicJDExtractor().extract(jd)
+        assert parsed.company == "Acme Labs"
+
+    def test_reads_company_from_an_about_sentence(self):
+        jd = (
+            "Backend Engineer\n\n"
+            "About Initech we build office software.\n\n"
+            "Requirements\n- Java and Spring\n"
+        )
+        parsed = HeuristicJDExtractor().extract(jd)
+        assert parsed.role == "Backend Engineer"
+        assert parsed.company == "Initech"
+
+    def test_about_the_role_is_not_read_as_a_company(self):
+        jd = "Engineer\n\nAbout the role\nYou will build services.\n\nRequirements\n- Python\n"
+        parsed = HeuristicJDExtractor().extract(jd)
         assert parsed.company is None
 
     def test_parses_a_bounded_experience_range(self):

@@ -251,6 +251,15 @@ describe("jd, alignment, dashboard and learning services", () => {
         });
     });
 
+    it("patches a JD with the verified role and company", () => {
+        jdService.update("j-1", { title: "Backend Engineer", company_name: "Acme" });
+
+        expect(axiosInstance.patch).toHaveBeenCalledWith("/jd/j-1", {
+            title: "Backend Engineer",
+            company_name: "Acme",
+        });
+    });
+
     it("generates an alignment from a resume and a jd", () => {
         alignmentService.generate("r-1", "j-1");
 

@@ -9,7 +9,7 @@ from app.api.deps import get_current_user_id
 from app.db.session import get_db
 from app.models.jd import JobDescription
 from app.repositories.jd_repo import JDRepository
-from app.schemas.jd import JDOut, JDUploadSchema
+from app.schemas.jd import JDOut, JDUpdateSchema, JDUploadSchema
 from app.services.parsing.jd_parser import JDParserService
 
 router = APIRouter()
@@ -77,6 +77,39 @@ async def get_jd(
     jd = await repo.get(jd_id)
     if not jd or jd.owner_id != owner_id:
         raise HTTPException(status_code=404, detail="Job description not found")
+    return jd
+
+
+@router.patch("/{jd_id}", response_model=JDOut)
+async def update_jd(
+    jd_id: uuid.UUID,
+    payload: JDUpdateSchema,
+    db: AsyncSession = Depends(get_db),
+    owner_id: uuid.UUID = Depends(get_current_user_id),
+):
+    """Apply the user's verified role/company, keeping structured_data in step
+    so every downstream view (dashboard, company intel) reads the same value."""
+    repo = JDRepository(JobDescription, db)
+    jd = await repo.get(jd_id)
+    if not jd or jd.owner_id != owner_id:
+        raise HTTPException(status_code=404, detail="Job description not found")
+
+    # Reassign structured_data as a new dict so SQLAlchemy tracks the JSON change.
+    structured = dict(jd.structured_data or {})
+
+    if payload.title is not None:
+        title = payload.title.strip()
+        if title:
+            jd.title = title
+            structured["role"] = title
+    if payload.company_name is not None:
+        company = payload.company_name.strip()
+        jd.company_name = company or None
+        structured["company"] = company or None
+
+    jd.structured_data = structured
+    await db.commit()
+    await db.refresh(jd)
     return jd
 
 

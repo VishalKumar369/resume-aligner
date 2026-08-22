@@ -18,7 +18,7 @@ vi.mock("next/navigation", () => ({
 
 vi.mock("@/services/api", () => ({
     companyService: { getInsights: vi.fn() },
-    jdService: { getById: vi.fn() },
+    jdService: { getById: vi.fn(), update: vi.fn() },
     alignmentService: { getById: vi.fn() },
     resumeService: { getVersions: vi.fn(), download: vi.fn() },
     apiErrorMessage: (e: any) => e?.message ?? "error",
@@ -58,6 +58,7 @@ describe("CompanyPage — analysis spotlight", () => {
         mockSearch = new URLSearchParams("jd=jd-1&resume=r-1&alignment=al-1");
 
         vi.mocked(jdService.getById).mockResolvedValue({ data: jd } as any);
+        vi.mocked(jdService.update).mockResolvedValue({ data: {} } as any);
         vi.mocked(alignmentService.getById).mockResolvedValue({ data: alignment } as any);
         vi.mocked(resumeService.getVersions).mockResolvedValue({ data: [version] } as any);
         vi.mocked(resumeService.download).mockResolvedValue({ data: new Blob(["x"]) } as any);
@@ -81,6 +82,38 @@ describe("CompanyPage — analysis spotlight", () => {
         // Requirements from the JD.
         expect(screen.getByText("What this role asks for")).toBeInTheDocument();
         expect(screen.getByText("Kafka")).toBeInTheDocument();
+    });
+
+    it("lets the user fix the role and company inline", async () => {
+        render(<CompanyPage />);
+        await screen.findByRole("heading", { name: /Senior Backend Engineer/i });
+
+        await userEvent.click(screen.getByRole("button", { name: /^Edit$/i }));
+
+        const roleInput = screen.getByDisplayValue("Senior Backend Engineer");
+        await userEvent.clear(roleInput);
+        await userEvent.type(roleInput, "Staff Backend Engineer");
+        const companyInput = screen.getByDisplayValue("Acme");
+        await userEvent.clear(companyInput);
+        await userEvent.type(companyInput, "Acme Corp");
+
+        await userEvent.click(screen.getByRole("button", { name: /^Save$/i }));
+
+        expect(jdService.update).toHaveBeenCalledWith("jd-1", {
+            title: "Staff Backend Engineer",
+            company_name: "Acme Corp",
+        });
+    });
+
+    it("does not call update when the edit is cancelled", async () => {
+        render(<CompanyPage />);
+        await screen.findByRole("heading", { name: /Senior Backend Engineer/i });
+
+        await userEvent.click(screen.getByRole("button", { name: /^Edit$/i }));
+        await userEvent.click(screen.getByRole("button", { name: /Cancel/i }));
+
+        expect(jdService.update).not.toHaveBeenCalled();
+        expect(screen.getByRole("heading", { name: /Senior Backend Engineer/i })).toBeInTheDocument();
     });
 
     it("makes the job description itself visible", async () => {
