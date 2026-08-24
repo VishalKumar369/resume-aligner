@@ -17,7 +17,7 @@ interface StatCardProps {
 
 export function StatCard({ title, value, subtitle, trend, icon: Icon, scoreType, delay = 0, className }: StatCardProps) {
     const numVal = typeof value === "number" ? value : parseFloat(String(value));
-    const scoreClass = scoreType ? getScoreColor(numVal) : "text-white";
+    const scoreClass = scoreType ? getScoreColor(numVal) : "text-foreground";
     const scoreBg = scoreType ? getScoreBg(numVal) : "";
 
     return (

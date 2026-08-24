@@ -63,7 +63,7 @@ export default function SkillsPage() {
                 </p>
             </div>
 
-            <div className="grid grid-cols-3 gap-4">
+            <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">
                 <StatCard title="Critical Gaps" value={counts.P1} icon={AlertCircle} subtitle="named in a role title or repeated" />
                 <StatCard title="Important Gaps" value={counts.P2} icon={BarChart3} subtitle="stated requirements" />
                 <StatCard title="Bonus Gaps" value={counts.P3} icon={Layers} subtitle="nice-to-haves" />

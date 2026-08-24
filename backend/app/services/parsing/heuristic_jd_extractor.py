@@ -18,7 +18,6 @@ from app.services.parsing.line_utils import (
 )
 from app.services.parsing.skill_vocabulary import find_skills, normalize_skill
 
-_COMPANY_LABEL = re.compile(r"^\s*(?:company|employer|organisation|organization)\s*[:\-]\s*(?P<value>.+)$", re.IGNORECASE)
 _LOCATION_LABEL = re.compile(r"^\s*location\s*[:\-]\s*(?P<value>.+)$", re.IGNORECASE)
 _WORK_MODE = re.compile(r"\b(remote|hybrid|on-?site|work from home|wfh|in-office)\b", re.IGNORECASE)
 _EMPLOYMENT_TYPE = re.compile(
@@ -54,11 +53,46 @@ _PREFERRED_CUES = re.compile(
     re.IGNORECASE,
 )
 
-_TITLE_HINT = re.compile(
-    r"\b(engineer|developer|scientist|analyst|manager|architect|designer|consultant|"
-    r"administrator|specialist|lead|director|intern|programmer|officer|executive)\b",
+_TITLE_NOUNS = (
+    "engineer|developer|scientist|analyst|manager|architect|designer|consultant|"
+    "administrator|specialist|lead|director|intern|programmer|officer|executive"
+)
+_TITLE_HINT = re.compile(rf"\b({_TITLE_NOUNS})\b", re.IGNORECASE)
+
+# "Role: ...", "Position - ...", "Job Title: ...": the value is stated outright.
+_ROLE_LABEL = re.compile(
+    r"^\s*(?:job\s*title|position|role|title|designation|vacancy)\s*[:\-]\s*(?P<value>.+)$",
     re.IGNORECASE,
 )
+
+# "We are looking for a Senior Data Engineer to ...": the title trails a hiring
+# cue. Bounded to a few words ending in a title noun so prose isn't swallowed.
+_ROLE_CUE = re.compile(
+    r"\b(?:hiring|looking\s+for|seeking|searching\s+for|recruiting|we\s+need|need|require|want)\b\s*"
+    r"(?:a|an|the)?\s*"
+    rf"(?P<value>(?:[A-Za-z][A-Za-z+#.]*\s+){{0,3}}(?:{_TITLE_NOUNS}))\b",
+    re.IGNORECASE,
+)
+
+# "Company: ...", "Employer - ...": the company is labelled outright.
+_COMPANY_LABEL = re.compile(
+    r"^\s*(?:company|employer|organisation|organization|company\s*name)\s*[:\-]\s*(?P<value>.+)$",
+    re.IGNORECASE,
+)
+
+# "Acme is hiring ...", "At Globex, we are looking ...". Case-sensitive on the
+# name so a lowercased sentence start is not misread as a company.
+_COMPANY_HIRING = re.compile(
+    r"(?m)^(?:At\s+)?(?P<value>[A-Z][\w&.\-]*(?:\s+[A-Z][\w&.\-]*){0,3}?)\s*,?\s+"
+    r"(?:is|are)\s+(?:looking|hiring|seeking|searching)"
+)
+
+# "About Acme" but not "About the role / About us".
+_COMPANY_ABOUT = re.compile(r"\b[Aa]bout\s+(?P<value>[A-Z][\w&.\-]*(?:\s+[A-Z][\w&.\-]*){0,3})\b")
+_ABOUT_STOP = frozenset({
+    "the", "this", "us", "our", "you", "your", "company", "role", "job",
+    "position", "team", "opportunity", "we", "what", "who",
+})
 
 _WORK_MODE_CANONICAL = {
     "work from home": "remote",
@@ -80,11 +114,11 @@ class HeuristicJDExtractor:
 
         mandatory, preferred = self._parse_skills(sections, body)
         min_years, max_years = self._parse_experience_years(sections, text)
-        role = self._parse_role(header_lines)
+        role = self._parse_role(text, header_lines)
 
         data = JDStructuredData(
             role=role,
-            company=self._parse_company(header_lines, role),
+            company=self._parse_company(text, header_lines, role),
             location=self._parse_location(header_lines),
             work_mode=self._parse_work_mode(text),
             employment_type=self._parse_employment_type(header_lines, text),
@@ -125,17 +159,33 @@ class HeuristicJDExtractor:
         candidate = line.strip()
         return bool(candidate) and len(candidate.split()) <= 10 and not candidate.endswith(".")
 
-    def _parse_role(self, header_lines: List[str]) -> Optional[str]:
+    def _parse_role(self, text: str, header_lines: List[str]) -> Optional[str]:
+        # A labelled line states the title outright, wherever it appears.
+        for line in text.splitlines()[:15]:
+            labelled = _ROLE_LABEL.match(line)
+            if labelled:
+                return self._strip_trailing_meta(labelled.group("value"))
+
+        # A title-shaped header line (the common structured case).
         for line in header_lines:
             candidate = strip_bullet(line)
             if _TITLE_HINT.search(candidate) and self._looks_like_a_title(candidate):
                 return self._strip_trailing_meta(candidate)
 
+        # A header line that is title-shaped even without a title noun.
         first = strip_bullet(header_lines[0]) if header_lines else ""
-        return self._strip_trailing_meta(first) if self._looks_like_a_title(first) else None
+        if self._looks_like_a_title(first):
+            return self._strip_trailing_meta(first)
 
-    def _parse_company(self, header_lines: List[str], role: Optional[str]) -> Optional[str]:
-        for line in header_lines:
+        # Last, a title trailing a hiring cue in prose ("looking for a X").
+        cued = _ROLE_CUE.search(text)
+        return cued.group("value").strip() if cued else None
+
+    def _parse_company(
+        self, text: str, header_lines: List[str], role: Optional[str]
+    ) -> Optional[str]:
+        # A labelled line states the company outright, wherever it appears.
+        for line in text.splitlines()[:15]:
             labelled = _COMPANY_LABEL.match(line)
             if labelled:
                 return labelled.group("value").strip() or None
@@ -154,6 +204,15 @@ class HeuristicJDExtractor:
             company = company.strip(" ,|-()")
             if company:
                 return company
+
+        # Prose cues: "Acme is hiring ...", then "About Acme".
+        hiring = _COMPANY_HIRING.search(text)
+        if hiring:
+            return hiring.group("value").strip() or None
+        for about in _COMPANY_ABOUT.finditer(text):
+            value = about.group("value").strip()
+            if value and value.split()[0].lower() not in _ABOUT_STOP:
+                return value
         return None
 
     def _parse_location(self, header_lines: List[str]) -> Optional[str]:

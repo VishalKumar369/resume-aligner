@@ -129,6 +129,26 @@ class DashboardSummarySchema(BaseModel):
     # empty state instead of a wall of zeros.
     has_data: bool = False
 
+class CompanyListItemSchema(BaseModel):
+    """A card for the Company Intelligence index.
+
+    `named` is False for a posting with no parsed company; it then carries
+    jd/resume/alignment ids so the client links straight to that analysis.
+    """
+    company_id: str
+    company: str
+    named: bool = True
+    jd_id: Optional[str] = None
+    resume_id: Optional[str] = None
+    alignment_id: Optional[str] = None
+    jd_count: int
+    roles: List[str] = []
+    demanded_skills: List[str] = []
+    your_best_alignment: Optional[float] = None
+    your_average_alignment: Optional[float] = None
+    gap_count: int = 0
+    last_activity: Optional[str] = None
+
 class CompanyInsightsSchema(BaseModel):
     company_id: str
     company: str

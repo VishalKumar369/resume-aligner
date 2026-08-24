@@ -6,7 +6,7 @@ import { useDropzone, type FileRejection } from "react-dropzone";
 import { useRouter } from "next/navigation";
 import {
     Upload, FileText, CheckCircle, Loader2, Link as LinkIcon, Sparkles,
-    ShieldCheck, Download, AlertTriangle, FileStack,
+    ShieldCheck, Download, AlertTriangle, FileStack, Building2, Briefcase, RotateCcw,
 } from "lucide-react";
 import { cn } from "@/lib/utils";
 import { resumeService, jdService, alignmentService, dashboardService, apiErrorMessage } from "@/services/api";
@@ -27,6 +27,10 @@ export default function UploadPage() {
     const [uploadedFile, setUploadedFile] = useState<File | null>(null);
     const [jdText, setJdText] = useState("");
     const [jdUrl, setJdUrl] = useState("");
+    // The parsed JD, plus the role/company the user can verify before analyzing.
+    const [jd, setJd] = useState<any>(null);
+    const [jdRole, setJdRole] = useState("");
+    const [jdCompany, setJdCompany] = useState("");
     // Most resumes should stay to one page, so single is the default. The user
     // can switch to multi when they have enough relevant content to justify it.
     const [pagePreference, setPagePreference] = useState<"single" | "multi">("single");
@@ -105,16 +109,32 @@ export default function UploadPage() {
         }
 
         if (currentStep === 2) {
-            if (!jdText.trim()) return;
-            return run(async () => {
-                const { data } = await jdService.upload({
-                    raw_text: jdText,
-                    title: "",
-                    company_name: "",
-                    url: jdUrl.trim() || undefined,
+            // First click parses the posting and shows the role/company to verify.
+            if (!jd) {
+                if (!jdText.trim()) return;
+                return run(async () => {
+                    const { data } = await jdService.upload({
+                        raw_text: jdText,
+                        title: "",
+                        company_name: "",
+                        url: jdUrl.trim() || undefined,
+                    });
+                    setJd(data);
+                    setJdId(data.id);
+                    // A placeholder title means the parser found nothing usable.
+                    setJdRole(data.title && data.title !== "Untitled role" ? data.title : "");
+                    setJdCompany(data.company_name || "");
                 });
-                setJdId(data.id);
-                const aligned = await alignmentService.generate(resume.id, data.id);
+            }
+
+            // Second click saves any corrections, then runs the alignment.
+            return run(async () => {
+                const patch: { title?: string; company_name?: string } = {};
+                if (jdRole.trim() && jdRole.trim() !== jd.title) patch.title = jdRole.trim();
+                if (jdCompany.trim() !== (jd.company_name || "")) patch.company_name = jdCompany.trim();
+                if (Object.keys(patch).length) await jdService.update(jd.id, patch);
+
+                const aligned = await alignmentService.generate(resume.id, jd.id);
                 setAlignment(aligned.data);
                 setCurrentStep(3);
             });
@@ -156,7 +176,7 @@ export default function UploadPage() {
     const primaryLabel = () => {
         if (processing) return null;
         if (currentStep === 1) return resume ? "Continue" : "Upload & Parse";
-        if (currentStep === 2) return "Analyze Alignment";
+        if (currentStep === 2) return jd ? "Analyze Alignment" : "Parse Job Description";
         if (currentStep === 3) return "Optimize Resume";
         if (currentStep === 4) return "View Analytics";
         return "Go to Dashboard";
@@ -165,10 +185,10 @@ export default function UploadPage() {
     const primaryDisabled =
         processing ||
         (currentStep === 1 && !uploadedFile) ||
-        (currentStep === 2 && !jdText.trim());
+        (currentStep === 2 && !jd && !jdText.trim());
 
     return (
-        <div className="min-h-screen bg-background flex flex-col items-center justify-center p-6 relative overflow-hidden">
+        <div className="min-h-screen bg-background flex flex-col items-center justify-center p-4 sm:p-6 relative overflow-hidden">
             <div className="absolute -top-40 -left-40 w-[500px] h-[500px] rounded-full bg-primary/5 blur-[120px]" />
             <div className="max-w-2xl w-full">
                 {/* Stepper */}
@@ -178,13 +198,13 @@ export default function UploadPage() {
                             <div className="flex flex-col items-center gap-1">
                                 <div className={cn(
                                     "w-9 h-9 rounded-full flex items-center justify-center text-sm font-bold border-2 transition-all duration-300",
-                                    currentStep > step.id ? "bg-primary border-primary text-white" :
+                                    currentStep > step.id ? "bg-primary border-primary text-primary-foreground" :
                                         currentStep === step.id ? "border-primary text-primary bg-primary/10" :
                                             "border-border text-muted bg-transparent"
                                 )}>
                                     {currentStep > step.id ? <CheckCircle className="w-4 h-4" /> : step.id}
                                 </div>
-                                <span className={cn("text-xs whitespace-nowrap hidden sm:block", currentStep === step.id ? "text-white" : "text-muted")}>
+                                <span className={cn("text-xs whitespace-nowrap hidden sm:block", currentStep === step.id ? "text-foreground" : "text-muted")}>
                                     {step.title}
                                 </span>
                             </div>
@@ -205,7 +225,7 @@ export default function UploadPage() {
                     >
                         {/* ---------------------------------------------- step 1 */}
                         {currentStep === 1 && (
-                            <div className="card-elevated rounded-2xl p-8">
+                            <div className="card-elevated rounded-2xl p-6 sm:p-8">
                                 <h2 className="text-2xl font-bold mb-2">Upload your resume</h2>
                                 <p className="text-muted-foreground text-sm mb-6">
                                     We&apos;ll parse it and show you exactly what we extracted before going further.
@@ -258,35 +278,101 @@ export default function UploadPage() {
 
                         {/* ---------------------------------------------- step 2 */}
                         {currentStep === 2 && (
-                            <div className="card-elevated rounded-2xl p-8">
-                                <h2 className="text-2xl font-bold mb-2">Add the job description</h2>
+                            <div className="card-elevated rounded-2xl p-6 sm:p-8">
+                                <h2 className="text-2xl font-bold mb-2">
+                                    {jd ? "Verify the role & company" : "Add the job description"}
+                                </h2>
                                 <p className="text-muted-foreground text-sm mb-6">
-                                    Paste the full posting. We read the requirements, responsibilities, and seniority from it.
+                                    {jd
+                                        ? "We pulled these from the posting. Fix anything the parser got wrong — they label this analysis across your dashboard and company intelligence."
+                                        : "Paste the full posting. We read the role, company, requirements, and responsibilities from it."}
                                 </p>
-                                <div className="space-y-4">
-                                    <textarea
-                                        rows={11}
-                                        className="input-field resize-none font-mono text-xs"
-                                        placeholder={"Senior Backend Engineer\nAcme Technologies - Bengaluru (Hybrid)\n\nRequirements\n- 3+ years building backend services\n- Strong Python and FastAPI\n\nNice to have\n- Kafka\n\nResponsibilities\n- Design and own backend services end to end"}
-                                        value={jdText}
-                                        onChange={(e) => setJdText(e.target.value)}
-                                    />
-                                    <div className="flex items-center gap-2 input-field text-sm text-muted">
-                                        <LinkIcon className="w-4 h-4 flex-shrink-0" />
-                                        <input
-                                            className="flex-1 bg-transparent outline-none"
-                                            placeholder="Link to the posting (optional — saved for reference, not fetched)"
-                                            value={jdUrl}
-                                            onChange={(e) => setJdUrl(e.target.value)}
+
+                                {!jd ? (
+                                    <div className="space-y-4">
+                                        <textarea
+                                            rows={11}
+                                            className="input-field resize-none font-mono text-xs"
+                                            placeholder={"Senior Backend Engineer\nAcme Technologies - Bengaluru (Hybrid)\n\nRequirements\n- 3+ years building backend services\n- Strong Python and FastAPI\n\nNice to have\n- Kafka\n\nResponsibilities\n- Design and own backend services end to end"}
+                                            value={jdText}
+                                            onChange={(e) => setJdText(e.target.value)}
                                         />
+                                        <div className="flex items-center gap-2 input-field text-sm text-muted">
+                                            <LinkIcon className="w-4 h-4 flex-shrink-0" />
+                                            <input
+                                                className="flex-1 bg-transparent outline-none"
+                                                placeholder="Link to the posting (optional — saved for reference, not fetched)"
+                                                value={jdUrl}
+                                                onChange={(e) => setJdUrl(e.target.value)}
+                                            />
+                                        </div>
                                     </div>
-                                </div>
+                                ) : (
+                                    <div className="space-y-4">
+                                        <div className="bg-surface-2 rounded-xl p-4 border border-border/50 space-y-4">
+                                            <div className="flex items-center justify-between">
+                                                <p className="text-sm font-semibold text-success">Parsed — please verify</p>
+                                                <button
+                                                    onClick={() => { setJd(null); setJdId(null); }}
+                                                    className="btn-ghost text-xs inline-flex items-center gap-1.5"
+                                                >
+                                                    <RotateCcw className="w-3.5 h-3.5" /> Re-paste
+                                                </button>
+                                            </div>
+
+                                            <div className="grid sm:grid-cols-2 gap-3">
+                                                <label className="block">
+                                                    <span className="text-xs text-muted mb-1 flex items-center gap-1">
+                                                        <Briefcase className="w-3 h-3" /> Role / title
+                                                    </span>
+                                                    <input
+                                                        className="input-field text-sm"
+                                                        placeholder="e.g. Senior Backend Engineer"
+                                                        value={jdRole}
+                                                        onChange={(e) => setJdRole(e.target.value)}
+                                                    />
+                                                </label>
+                                                <label className="block">
+                                                    <span className="text-xs text-muted mb-1 flex items-center gap-1">
+                                                        <Building2 className="w-3 h-3" /> Company
+                                                    </span>
+                                                    <input
+                                                        className="input-field text-sm"
+                                                        placeholder="e.g. Acme Technologies"
+                                                        value={jdCompany}
+                                                        onChange={(e) => setJdCompany(e.target.value)}
+                                                    />
+                                                </label>
+                                            </div>
+
+                                            {(!jdRole.trim() || !jdCompany.trim()) && (
+                                                <p className="text-xs text-warning flex items-start gap-1.5">
+                                                    <AlertTriangle className="w-3.5 h-3.5 flex-shrink-0 mt-0.5" />
+                                                    <span>
+                                                        The parser couldn&apos;t find{" "}
+                                                        {[!jdRole.trim() && "a role", !jdCompany.trim() && "a company"].filter(Boolean).join(" or ")}.
+                                                        {" "}Add {!jdRole.trim() && !jdCompany.trim() ? "them" : "it"} so this analysis isn&apos;t
+                                                        labelled &quot;Untitled&quot;.
+                                                    </span>
+                                                </p>
+                                            )}
+
+                                            <div className="flex flex-wrap gap-x-4 gap-y-1 text-xs text-muted pt-2 border-t border-border/40">
+                                                {jd.structured_data?.seniority && <span className="capitalize">{jd.structured_data.seniority}</span>}
+                                                {jd.structured_data?.location && <span>{jd.structured_data.location}</span>}
+                                                {jd.structured_data?.work_mode && <span className="capitalize">{jd.structured_data.work_mode}</span>}
+                                                <span>{jd.structured_data?.requirements?.mandatory_skills?.length || 0} required skills</span>
+                                                <span>{jd.structured_data?.responsibilities?.length || 0} responsibilities</span>
+                                            </div>
+                                        </div>
+                                    </div>
+                                )}
                             </div>
                         )}
 
                         {/* ---------------------------------------------- step 3 */}
                         {currentStep === 3 && alignment && (
-                            <div className="card-elevated rounded-2xl p-8 space-y-4">
+                            <div className="card-elevated rounded-2xl p-6 sm:p-8 space-y-4">
                                 <h2 className="text-2xl font-bold">Alignment</h2>
 
                                 {alignment.extraction_health && !alignment.extraction_health.resume_ok && (
@@ -403,7 +489,7 @@ export default function UploadPage() {
                                                             : "border-border bg-surface-2 hover:border-primary/40"
                                                     )}
                                                 >
-                                                    <span className={cn("text-sm font-semibold", active ? "text-primary" : "text-white")}>
+                                                    <span className={cn("text-sm font-semibold", active ? "text-primary" : "text-foreground")}>
                                                         {option.title}
                                                     </span>
                                                     <span className="block text-[11px] text-muted mt-1 leading-snug">
@@ -419,7 +505,7 @@ export default function UploadPage() {
 
                         {/* ---------------------------------------------- step 4 */}
                         {currentStep === 4 && optimization && (
-                            <div className="card-elevated rounded-2xl p-8 space-y-4">
+                            <div className="card-elevated rounded-2xl p-6 sm:p-8 space-y-4">
                                 <div className="flex items-start justify-between">
                                     <div>
                                         <h2 className="text-2xl font-bold">Resume optimized</h2>
@@ -531,7 +617,7 @@ export default function UploadPage() {
 
                         {/* ---------------------------------------------- step 5 */}
                         {currentStep === 5 && (
-                            <div className="card-elevated rounded-2xl p-8 text-center">
+                            <div className="card-elevated rounded-2xl p-6 sm:p-8 text-center">
                                 <div className="w-20 h-20 rounded-full bg-primary/10 flex items-center justify-center mx-auto mb-6">
                                     <CheckCircle className="w-10 h-10 text-primary" />
                                 </div>

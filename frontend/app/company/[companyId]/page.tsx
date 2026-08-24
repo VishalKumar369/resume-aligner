@@ -4,11 +4,11 @@ import { Suspense, useState } from "react";
 import { motion } from "framer-motion";
 import { useParams, useSearchParams } from "next/navigation";
 import {
-    Building2, ExternalLink, Info, Download, FileText, Target, Zap, Layers, Briefcase, Sparkles,
+    Building2, ExternalLink, Info, Download, FileText, Target, Zap, Layers, Briefcase, Sparkles, ArrowRight, Pencil,
 } from "lucide-react";
 import Link from "next/link";
 import { StatCard } from "@/components/ui/StatCard";
-import { EmptyState, ErrorState, PriorityBadge, Skeleton, StatSkeletonRow } from "@/components/ui/States";
+import { EmptyState, ErrorState, PriorityBadge, ScorePill, Skeleton, StatSkeletonRow } from "@/components/ui/States";
 import { useApi } from "@/hooks/useApi";
 import { cn, getScoreColor, formatScore } from "@/lib/utils";
 import { alignmentService, apiErrorMessage, companyService, jdService, resumeService } from "@/services/api";
@@ -37,7 +37,7 @@ function CompanyPageContent() {
     const { data: insights, loading: insightsLoading, error: insightsError, reload } =
         useApi<any>(() => companyService.getInsights(companyId), [companyId]);
 
-    const { data: jd, loading: jdLoading } = useApi<any>(
+    const { data: jd, loading: jdLoading, reload: reloadJd } = useApi<any>(
         () => jdService.getById(jdId!), [jdId], { skip: !jdId });
     const { data: alignment, loading: alignLoading } = useApi<any>(
         () => alignmentService.getById(alignmentId!), [alignmentId], { skip: !alignmentId });
@@ -45,6 +45,41 @@ function CompanyPageContent() {
         () => resumeService.getVersions(resumeId!), [resumeId], { skip: !resumeId });
 
     const [downloadError, setDownloadError] = useState<string | null>(null);
+
+    // Inline edit of this posting's role/company, for postings whose parse
+    // predates the upload verify step.
+    const [editing, setEditing] = useState(false);
+    const [editRole, setEditRole] = useState("");
+    const [editCompany, setEditCompany] = useState("");
+    const [saving, setSaving] = useState(false);
+    const [saveError, setSaveError] = useState<string | null>(null);
+
+    const startEdit = () => {
+        setEditRole(jd?.title && jd.title !== "Untitled role" ? jd.title : "");
+        setEditCompany(jd?.company_name || "");
+        setSaveError(null);
+        setEditing(true);
+    };
+
+    const saveIdentity = async () => {
+        const patch: { title?: string; company_name?: string } = {};
+        if (editRole.trim() && editRole.trim() !== jd.title) patch.title = editRole.trim();
+        if (editCompany.trim() !== (jd.company_name || "")) patch.company_name = editCompany.trim();
+        if (!Object.keys(patch).length) { setEditing(false); return; }
+
+        setSaving(true);
+        setSaveError(null);
+        try {
+            await jdService.update(jdId!, patch);
+            setEditing(false);
+            reloadJd();
+            reload(); // refresh the aggregate company view too
+        } catch (err: any) {
+            setSaveError(apiErrorMessage(err, "Couldn't save"));
+        } finally {
+            setSaving(false);
+        }
+    };
 
     const download = async (versionId: string, filename: string, format: "docx" | "pdf") => {
         setDownloadError(null);
@@ -91,9 +126,15 @@ function CompanyPageContent() {
         );
     }
 
-    const requirements = (jd?.structured_data?.requirements || {}) as any;
+    const structured = (jd?.structured_data || {}) as any;
+    const requirements = (structured.requirements || {}) as any;
     const mandatory: string[] = requirements.mandatory_skills || [];
     const preferred: string[] = requirements.preferred_skills || [];
+    const qualifications: string[] = requirements.qualifications || [];
+    const responsibilities: string[] = structured.responsibilities || [];
+    const experienceRange = [structured.min_experience_years, structured.max_experience_years].filter(
+        (v) => v !== null && v !== undefined
+    );
     const missing: any[] = alignment?.missing_skills || [];
     const matched: string[] = alignment?.matched_skills || [];
     const tailored = (versions || []).filter((v) => v.jd_id === jdId);
@@ -109,26 +150,60 @@ function CompanyPageContent() {
             {scoped && jd && (
                 <motion.div initial={{ opacity: 0, y: 12 }} animate={{ opacity: 1, y: 0 }} className="space-y-6">
                     <div className="card-elevated rounded-2xl p-6">
-                        <div className="flex items-start justify-between gap-4 flex-wrap">
-                            <div className="flex items-center gap-4 min-w-0">
-                                <div className="w-14 h-14 rounded-2xl bg-primary/10 border border-primary/20 flex items-center justify-center flex-shrink-0">
-                                    <Building2 className="w-7 h-7 text-primary" />
+                        {editing ? (
+                            <div className="space-y-3">
+                                <div className="grid sm:grid-cols-2 gap-3">
+                                    <label className="block">
+                                        <span className="text-xs text-muted mb-1 flex items-center gap-1">
+                                            <Briefcase className="w-3 h-3" /> Role / title
+                                        </span>
+                                        <input className="input-field text-sm" placeholder="e.g. Senior Backend Engineer"
+                                            value={editRole} onChange={(e) => setEditRole(e.target.value)} />
+                                    </label>
+                                    <label className="block">
+                                        <span className="text-xs text-muted mb-1 flex items-center gap-1">
+                                            <Building2 className="w-3 h-3" /> Company
+                                        </span>
+                                        <input className="input-field text-sm" placeholder="e.g. Acme Technologies"
+                                            value={editCompany} onChange={(e) => setEditCompany(e.target.value)} />
+                                    </label>
                                 </div>
-                                <div className="min-w-0">
-                                    <h1 className="text-2xl font-bold truncate">{jd.title || "This role"}</h1>
-                                    <p className="text-sm text-muted mt-1">
-                                        {[jd.company_name, jd.structured_data?.seniority, jd.structured_data?.location, jd.structured_data?.work_mode]
-                                            .filter(Boolean).join(" · ") || "Selected analysis"}
-                                    </p>
+                                {saveError && <p className="text-xs text-error">{saveError}</p>}
+                                <div className="flex gap-2">
+                                    <button onClick={saveIdentity} disabled={saving} className="btn-primary text-sm disabled:opacity-50">
+                                        {saving ? "Saving…" : "Save"}
+                                    </button>
+                                    <button onClick={() => setEditing(false)} className="btn-ghost text-sm">Cancel</button>
                                 </div>
                             </div>
-                            {jd.url && (
-                                <a href={jd.url} target="_blank" rel="noopener noreferrer"
-                                    className="text-xs text-primary hover:underline inline-flex items-center gap-1 flex-shrink-0">
-                                    Open posting <ExternalLink className="w-3 h-3" />
-                                </a>
-                            )}
-                        </div>
+                        ) : (
+                            <div className="flex items-start justify-between gap-4 flex-wrap">
+                                <div className="flex items-center gap-4 min-w-0">
+                                    <div className="w-14 h-14 rounded-2xl bg-primary/10 border border-primary/20 flex items-center justify-center flex-shrink-0">
+                                        <Building2 className="w-7 h-7 text-primary" />
+                                    </div>
+                                    <div className="min-w-0">
+                                        <h1 className="text-2xl font-bold truncate">{jd.title || "This role"}</h1>
+                                        <p className="text-sm text-muted mt-1">
+                                            {[jd.company_name, jd.structured_data?.seniority, jd.structured_data?.location, jd.structured_data?.work_mode]
+                                                .filter(Boolean).join(" · ") || "Selected analysis"}
+                                        </p>
+                                    </div>
+                                </div>
+                                <div className="flex items-center gap-3 flex-shrink-0">
+                                    <button onClick={startEdit}
+                                        className="btn-ghost text-xs inline-flex items-center gap-1.5">
+                                        <Pencil className="w-3.5 h-3.5" /> Edit
+                                    </button>
+                                    {jd.url && (
+                                        <a href={jd.url} target="_blank" rel="noopener noreferrer"
+                                            className="text-xs text-primary hover:underline inline-flex items-center gap-1">
+                                            Open posting <ExternalLink className="w-3 h-3" />
+                                        </a>
+                                    )}
+                                </div>
+                            </div>
+                        )}
                     </div>
 
                     {alignment && (
@@ -139,6 +214,54 @@ function CompanyPageContent() {
                             <StatCard title="Experience Match" value={alignment.experience_match_score ?? 0} icon={Briefcase} scoreType delay={0.15} />
                         </div>
                     )}
+
+                    {/* The job description itself, so the role is visible here. */}
+                    <motion.div initial={{ opacity: 0, y: 16 }} animate={{ opacity: 1, y: 0 }}
+                        className="card-elevated rounded-2xl p-6">
+                        <h3 className="text-sm font-semibold mb-3 inline-flex items-center gap-2">
+                            <FileText className="w-4 h-4 text-primary" /> About this role
+                        </h3>
+                        {(structured.employment_type || experienceRange.length > 0 || structured.seniority) && (
+                            <div className="flex flex-wrap gap-2 mb-4 text-xs">
+                                {structured.seniority && (
+                                    <span className="px-2.5 py-1 bg-surface-2 border border-border rounded-lg capitalize">{structured.seniority}</span>
+                                )}
+                                {structured.employment_type && (
+                                    <span className="px-2.5 py-1 bg-surface-2 border border-border rounded-lg">{structured.employment_type}</span>
+                                )}
+                                {experienceRange.length > 0 && (
+                                    <span className="px-2.5 py-1 bg-surface-2 border border-border rounded-lg">
+                                        {experienceRange.join("–")}+ yrs experience
+                                    </span>
+                                )}
+                            </div>
+                        )}
+                        {responsibilities.length > 0 ? (
+                            <ul className="space-y-1.5">
+                                {responsibilities.map((r, i) => (
+                                    <li key={i} className="text-sm text-muted-foreground flex gap-2">
+                                        <span className="text-primary mt-1.5 w-1 h-1 rounded-full bg-primary flex-shrink-0" />
+                                        {r}
+                                    </li>
+                                ))}
+                            </ul>
+                        ) : (
+                            <p className="text-sm text-muted">
+                                No responsibilities were extracted from this posting.
+                                {jd.url && " Open the original posting above for the full description."}
+                            </p>
+                        )}
+                        {qualifications.length > 0 && (
+                            <div className="mt-4 pt-3 border-t border-border/50">
+                                <p className="text-xs font-medium text-muted mb-2">Qualifications</p>
+                                <ul className="space-y-1">
+                                    {qualifications.map((q, i) => (
+                                        <li key={i} className="text-xs text-muted">{q}</li>
+                                    ))}
+                                </ul>
+                            </div>
+                        )}
+                    </motion.div>
 
                     <div className="grid lg:grid-cols-2 gap-6">
                         {/* Tailored resume — the whole point of coming here */}
@@ -246,7 +369,7 @@ function CompanyPageContent() {
                 <>
                     {scoped && (
                         <div className="pt-2">
-                            <h2 className="text-lg font-semibold text-white">Across {insights.company}</h2>
+                            <h2 className="text-lg font-semibold text-foreground">Across {insights.company}</h2>
                             <p className="text-xs text-muted mt-0.5">All roles you&apos;ve saved for this company</p>
                         </div>
                     )}
@@ -316,26 +439,11 @@ function CompanyPageContent() {
                         </motion.div>
                     </div>
 
-                    <div className="card-elevated rounded-2xl overflow-hidden">
-                        <div className="p-5 border-b border-border">
-                            <h3 className="text-sm font-semibold">Saved postings</h3>
-                        </div>
-                        <div className="divide-y divide-border/50">
+                    <div>
+                        <h3 className="text-sm font-semibold mb-3">Saved postings</h3>
+                        <div className="space-y-3">
                             {insights.postings?.map((posting: any) => (
-                                <div key={posting.jd_id} className="p-4 flex items-center justify-between gap-4">
-                                    <div className="min-w-0">
-                                        <p className="text-sm truncate">{posting.title}</p>
-                                        <p className="text-xs text-muted mt-0.5">
-                                            Added {posting.added_at ? new Date(posting.added_at).toLocaleDateString() : "—"}
-                                        </p>
-                                    </div>
-                                    {posting.url && (
-                                        <a href={posting.url} target="_blank" rel="noopener noreferrer"
-                                            className="text-xs text-primary hover:underline inline-flex items-center gap-1 flex-shrink-0">
-                                            Open <ExternalLink className="w-3 h-3" />
-                                        </a>
-                                    )}
-                                </div>
+                                <PostingCard key={posting.jd_id} posting={posting} companyId={companyId} />
                             ))}
                         </div>
                     </div>
@@ -355,6 +463,67 @@ function CompanyPageContent() {
                     </div>
                 )
             )}
+        </div>
+    );
+}
+
+/**
+ * One saved posting with its own details — role, requirements, and your latest
+ * match — and a link into the full analysis (with the tailored resume).
+ */
+function PostingCard({ posting, companyId }: { posting: any; companyId: string }) {
+    const params = new URLSearchParams({ jd: posting.jd_id });
+    if (posting.resume_id) params.set("resume", posting.resume_id);
+    if (posting.alignment_id) params.set("alignment", posting.alignment_id);
+    const href = `/company/${companyId}?${params.toString()}`;
+
+    const meta = [posting.seniority, posting.location, posting.work_mode].filter(Boolean).join(" · ");
+    const mandatory: string[] = posting.mandatory_skills || [];
+    const preferred: string[] = posting.preferred_skills || [];
+    const analyzed = posting.your_alignment !== null && posting.your_alignment !== undefined;
+
+    return (
+        <div className="card-elevated rounded-2xl p-5">
+            <div className="flex items-start justify-between gap-4 flex-wrap">
+                <div className="min-w-0">
+                    <p className="font-medium truncate">{posting.title}</p>
+                    <p className="text-xs text-muted mt-0.5">
+                        {[meta, posting.added_at && `added ${new Date(posting.added_at).toLocaleDateString()}`]
+                            .filter(Boolean).join(" · ") || "—"}
+                    </p>
+                </div>
+                {analyzed ? (
+                    <div className="text-right flex-shrink-0">
+                        <ScorePill score={posting.your_alignment} />
+                        <p className="text-[11px] text-muted mt-1">your match</p>
+                    </div>
+                ) : (
+                    <span className="text-[11px] text-muted flex-shrink-0">Not analyzed yet</span>
+                )}
+            </div>
+
+            {(mandatory.length > 0 || preferred.length > 0) && (
+                <div className="mt-3 flex flex-wrap gap-1.5">
+                    {mandatory.map((s) => (
+                        <span key={s} className="px-2 py-0.5 bg-surface-2 border border-border rounded-md text-[11px]">{s}</span>
+                    ))}
+                    {preferred.map((s) => (
+                        <span key={`p-${s}`} className="px-2 py-0.5 bg-surface/40 border border-border/50 rounded-md text-[11px] text-muted">{s}</span>
+                    ))}
+                </div>
+            )}
+
+            <div className="mt-4 flex items-center gap-4">
+                <Link href={href} className="text-xs text-primary hover:underline inline-flex items-center gap-1">
+                    View full analysis <ArrowRight className="w-3 h-3" />
+                </Link>
+                {posting.url && (
+                    <a href={posting.url} target="_blank" rel="noopener noreferrer"
+                        className="text-xs text-muted hover:text-foreground inline-flex items-center gap-1">
+                        Open posting <ExternalLink className="w-3 h-3" />
+                    </a>
+                )}
+            </div>
         </div>
     );
 }

@@ -86,7 +86,7 @@ export default function DashboardPage() {
     return (
         <motion.div initial={{ opacity: 0 }} animate={{ opacity: 1 }} className="space-y-6 max-w-7xl mx-auto">
             <div>
-                <h1 className="text-2xl font-bold text-white">Career Intelligence Dashboard</h1>
+                <h1 className="text-2xl font-bold text-foreground">Career Intelligence Dashboard</h1>
                 <p className="text-sm text-muted mt-1">
                     {analyses.length} analys{analyses.length === 1 ? "is" : "es"} ·{" "}
                     {uniqueResumes} resume{uniqueResumes === 1 ? "" : "s"} ·{" "}
@@ -97,7 +97,7 @@ export default function DashboardPage() {
             {/* Selected-analysis context */}
             <div className="flex flex-wrap items-baseline justify-between gap-2">
                 <div>
-                    <h2 className="text-lg font-semibold text-white">
+                    <h2 className="text-lg font-semibold text-foreground">
                         {active?.company || "Unknown company"}
                         {active?.role ? <span className="text-muted font-normal"> — {active.role}</span> : null}
                     </h2>
@@ -125,19 +125,20 @@ export default function DashboardPage() {
                 <StatCard title="Experience Match" value={detail?.experience_match_score ?? 0} icon={Briefcase} scoreType delay={0.15} />
             </div>
 
-            {/* Both panels share one height; recommendations scroll past it. */}
-            <div className="grid lg:grid-cols-3 gap-6 lg:h-[440px]">
-                <div className="lg:col-span-1 lg:h-full">
-                    <CareerRadarChart axes={radarAxes} className="h-full" />
+            {/* Both panels are the same fixed height; recommendations scroll
+                within theirs so the content can't overflow onto the heatmap. */}
+            <div className="grid lg:grid-cols-3 gap-6 lg:items-start">
+                <div className="lg:col-span-1">
+                    <CareerRadarChart axes={radarAxes} className="lg:h-[440px]" />
                 </div>
 
                 <motion.div
                     initial={{ opacity: 0, y: 16 }}
                     animate={{ opacity: 1, y: 0 }}
                     transition={{ delay: 0.25 }}
-                    className="lg:col-span-2 card-elevated rounded-2xl p-6 flex flex-col lg:h-full"
+                    className="lg:col-span-2 card-elevated rounded-2xl p-6 flex flex-col lg:h-[440px]"
                 >
-                    <h3 className="text-sm font-semibold text-white mb-4 flex-shrink-0">Recommended Improvements</h3>
+                    <h3 className="text-sm font-semibold text-foreground mb-4 flex-shrink-0">Recommended Improvements</h3>
                     {detailLoading ? (
                         <div className="space-y-3">
                             {[0, 1, 2].map((i) => <Skeleton key={i} className="h-10 rounded-lg" />)}

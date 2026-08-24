@@ -1,6 +1,10 @@
+from datetime import datetime
+from types import SimpleNamespace
+from uuid import uuid4
+
 import pytest
 
-from app.services.company.insights import slugify
+from app.services.company.insights import CompanyInsightsService, slugify
 from app.services.dashboard.analytics import (
     PROBABILITY_CAVEAT,
     DashboardAnalyticsService,
@@ -89,6 +93,140 @@ class TestSkillGapAggregator:
         clusters = cluster_by_category(report.gaps)
         assert {item.skill for item in clusters["containers"]} == {"Docker", "Kubernetes"}
         assert {item.skill for item in clusters["messaging"]} == {"Kafka"}
+
+
+def _jd(company, title, mandatory=None, created=None):
+    return SimpleNamespace(
+        id=uuid4(),
+        company_name=company,
+        title=title,
+        created_at=created or datetime(2026, 8, 1),
+        structured_data={"requirements": {"mandatory_skills": mandatory or []}},
+    )
+
+
+def _align(jd_id, score, missing=None, created=None):
+    return SimpleNamespace(
+        jd_id=jd_id,
+        total_alignment_score=score,
+        created_at=created or datetime(2026, 8, 1),
+        analysis_data={"missing_skills": missing or []},
+    )
+
+
+class TestCompanySummaries:
+    def test_groups_postings_by_company(self):
+        acme1 = _jd("Acme", "Backend Engineer")
+        acme2 = _jd("Acme", "Platform Engineer")
+        globex = _jd("Globex", "ML Engineer")
+
+        cards = CompanyInsightsService().summarize_companies([acme1, acme2, globex], [])
+
+        by_name = {c["company"]: c for c in cards}
+        assert by_name["Acme"]["jd_count"] == 2
+        assert set(by_name["Acme"]["roles"]) == {"Backend Engineer", "Platform Engineer"}
+        assert by_name["Globex"]["jd_count"] == 1
+
+    def test_folds_company_name_variants_into_one_card(self):
+        cards = CompanyInsightsService().summarize_companies(
+            [_jd("Acme", "A"), _jd("acme", "B")], []
+        )
+        assert len(cards) == 1
+        assert cards[0]["jd_count"] == 2
+
+    def test_computes_best_and_average_alignment(self):
+        jd = _jd("Acme", "Backend Engineer")
+        aligns = [_align(jd.id, 80.0), _align(jd.id, 60.0)]
+
+        card = CompanyInsightsService().summarize_companies([jd], aligns)[0]
+
+        assert card["your_best_alignment"] == 80.0
+        assert card["your_average_alignment"] == 70.0
+
+    def test_surfaces_demanded_skills_and_gap_count(self):
+        jd = _jd("Acme", "Backend Engineer", mandatory=["Python", "FastAPI"])
+        aligns = [_align(jd.id, 70.0, missing=[gap("Kafka"), gap("Docker")])]
+
+        card = CompanyInsightsService().summarize_companies([jd], aligns)[0]
+
+        assert set(card["demanded_skills"]) == {"Python", "FastAPI"}
+        assert card["gap_count"] == 2
+
+    def test_surfaces_postings_with_no_company_name_as_role_cards(self):
+        cards = CompanyInsightsService().summarize_companies(
+            [_jd("Acme", "Backend Engineer"), _jd("", "Data Scientist"), _jd(None, "ML Engineer")], []
+        )
+
+        # The named company groups into one card; each nameless posting still
+        # appears, labelled by its role and flagged so the UI links to its analysis.
+        by_name = {c["company"]: c for c in cards}
+        assert by_name["Acme"]["named"] is True
+        assert by_name["Data Scientist"]["named"] is False
+        assert by_name["Data Scientist"]["jd_count"] == 1
+        assert by_name["ML Engineer"]["named"] is False
+        assert len(cards) == 3
+
+    def test_a_role_card_carries_ids_for_the_scoped_link(self):
+        jd = _jd("", "Data Scientist")
+        latest = _align(jd.id, 66.0)
+        latest.resume_id = uuid4()
+        latest.id = uuid4()
+
+        card = CompanyInsightsService().summarize_companies([jd], [latest])[0]
+
+        assert card["named"] is False
+        assert card["jd_id"] == str(jd.id)
+        assert card["resume_id"] == str(latest.resume_id)
+        assert card["alignment_id"] == str(latest.id)
+
+    def test_ranks_the_best_matching_company_first(self):
+        strong = _jd("Strong", "A")
+        weak = _jd("Weak", "B")
+        aligns = [_align(strong.id, 90.0), _align(weak.id, 40.0)]
+
+        cards = CompanyInsightsService().summarize_companies([weak, strong], aligns)
+
+        assert [c["company"] for c in cards] == ["Strong", "Weak"]
+
+    def test_a_company_with_no_runs_has_null_scores(self):
+        card = CompanyInsightsService().summarize_companies([_jd("Acme", "A")], [])[0]
+        assert card["your_best_alignment"] is None
+        assert card["gap_count"] == 0
+
+
+class TestPostingDetail:
+    def test_carries_role_requirements_and_your_latest_match(self):
+        jd = SimpleNamespace(
+            id=uuid4(), title="Backend Engineer", url="https://x",
+            created_at=datetime(2026, 8, 1),
+            structured_data={
+                "seniority": "senior", "location": "Remote",
+                "requirements": {"mandatory_skills": ["Python"], "preferred_skills": ["Kafka"]},
+            },
+        )
+        latest = _align(jd.id, 78.0)
+        latest.ats_score = 62.0
+        latest.resume_id = uuid4()
+        latest.id = uuid4()
+
+        detail = CompanyInsightsService()._posting_detail(jd, latest)
+
+        assert detail["title"] == "Backend Engineer"
+        assert detail["seniority"] == "senior"
+        assert detail["mandatory_skills"] == ["Python"]
+        assert detail["preferred_skills"] == ["Kafka"]
+        assert detail["your_alignment"] == 78.0
+        assert detail["your_ats"] == 62.0
+        assert detail["resume_id"] == str(latest.resume_id)
+        assert detail["alignment_id"] == str(latest.id)
+
+    def test_a_posting_never_analyzed_has_null_match(self):
+        jd = SimpleNamespace(id=uuid4(), title="Role", url=None, created_at=None, structured_data={})
+        detail = CompanyInsightsService()._posting_detail(jd, None)
+
+        assert detail["your_alignment"] is None
+        assert detail["resume_id"] is None
+        assert detail["mandatory_skills"] == []
 
 
 class TestLearningResources:

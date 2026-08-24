@@ -120,6 +120,9 @@ export const jdService = {
         api.post("/jd/upload", data),
     getAll: (params?: { skip?: number; limit?: number }) => api.get("/jd/list", { params }),
     getById: (jdId: string) => api.get(`/jd/${jdId}`),
+    /** Persist the user's verified role/company from the review step. */
+    update: (jdId: string, data: { title?: string; company_name?: string }) =>
+        api.patch(`/jd/${jdId}`, data),
 };
 
 // ----------------------------------------------------------------- alignment
@@ -143,6 +146,7 @@ export const learningService = {
 };
 
 export const companyService = {
+    getAll: () => api.get("/company/list"),
     getInsights: (companyId: string) => api.get(`/company/${encodeURIComponent(companyId)}/insights`),
 };
 

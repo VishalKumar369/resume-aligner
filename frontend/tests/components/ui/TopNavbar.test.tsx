@@ -4,6 +4,7 @@ import { describe, expect, it } from "vitest";
 
 import { TopNavbar } from "@/components/ui/TopNavbar";
 import { useAuthStore } from "@/store/authStore";
+import { useUiStore } from "@/store/uiStore";
 import { routerMock } from "../../mocks/router";
 
 const signIn = (name: string, email = "ada@example.com") =>
@@ -15,6 +16,16 @@ describe("TopNavbar", () => {
         render(<TopNavbar title="Dashboard" />);
 
         expect(screen.getByRole("heading", { name: "Dashboard" })).toBeInTheDocument();
+    });
+
+    it("opens the mobile navigation drawer from the hamburger", async () => {
+        signIn("Ada Lovelace");
+        render(<TopNavbar />);
+
+        expect(useUiStore.getState().mobileNavOpen).toBe(false);
+        await userEvent.click(screen.getByRole("button", { name: /open menu/i }));
+
+        expect(useUiStore.getState().mobileNavOpen).toBe(true);
     });
 
     it("links to a new analysis", () => {
