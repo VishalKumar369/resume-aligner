@@ -57,13 +57,16 @@ const faqs = [
 function CountUp({ value, prefix = "" }: { value: string; prefix?: string }) {
     const ref = useRef<HTMLSpanElement>(null);
     const inView = useInView(ref, { once: true, margin: "-60px" });
-    const match = value.match(/^(\d+)(\D*)$/);
-    const target = match ? parseInt(match[1], 10) : 0;
-    const suffix = match ? match[2] : value;
+    // Parse once. Keep only primitives — an array in the effect deps would make
+    // it re-run (and restart the animation) on every render, never settling.
+    const parsed = value.match(/^(\d+)(\D*)$/);
+    const numeric = parsed !== null;
+    const target = parsed ? parseInt(parsed[1], 10) : 0;
+    const suffix = parsed ? parsed[2] : "";
     const [n, setN] = useState(0);
 
     useEffect(() => {
-        if (!inView || !match) return;
+        if (!inView || !numeric) return;
         const duration = 1200;
         const start = performance.now();
         let raf = 0;
@@ -75,13 +78,12 @@ function CountUp({ value, prefix = "" }: { value: string; prefix?: string }) {
         };
         raf = requestAnimationFrame(tick);
         return () => cancelAnimationFrame(raf);
-    }, [inView, match, target]);
+    }, [inView, numeric, target]);
 
     return (
         <span ref={ref}>
             {prefix}
-            {match ? n : ""}
-            {match ? suffix : value}
+            {numeric ? `${n}${suffix}` : value}
         </span>
     );
 }
