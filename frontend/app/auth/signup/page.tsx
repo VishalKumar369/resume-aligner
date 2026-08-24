@@ -74,7 +74,7 @@ export default function SignupPage() {
     };
 
     return (
-        <div className="min-h-screen bg-background flex items-center justify-center p-6 relative overflow-hidden">
+        <div className="min-h-screen bg-background flex items-center justify-center p-4 sm:p-6 relative overflow-hidden">
             <div className="absolute -top-40 -right-40 w-[500px] h-[500px] rounded-full bg-primary/5 blur-[100px]" />
             <div className="absolute -bottom-40 -left-40 w-[400px] h-[400px] rounded-full bg-accent/5 blur-[80px]" />
 
@@ -105,7 +105,7 @@ export default function SignupPage() {
 
                 {/* Right side - Form */}
                 <motion.div initial={{ opacity: 0, x: 20 }} animate={{ opacity: 1, x: 0 }} transition={{ duration: 0.5, delay: 0.1 }}>
-                    <div className="card-elevated rounded-2xl p-8">
+                    <div className="card-elevated rounded-2xl p-6 sm:p-8">
                         <h2 className="text-xl font-bold mb-6">Create your free account</h2>
                         {error && <div className="text-red-500 text-sm mb-4">{error}</div>}
                         <form className="space-y-4" onSubmit={handleSubmit}>

@@ -60,7 +60,7 @@ export default function ReadinessPage() {
                 </p>
             </div>
 
-            <div className="grid grid-cols-3 gap-4">
+            <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">
                 <StatCard title="Overall Readiness" value={summary.career_readiness_index} icon={Target} scoreType
                     subtitle="0.65 alignment + 0.35 ATS" />
                 <StatCard title="Average Alignment" value={summary.avg_alignment_score} icon={TrendingUp} scoreType

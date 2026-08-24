@@ -72,12 +72,14 @@ if (!globalThis.IntersectionObserver) {
 beforeEach(async () => {
     const { resetRouter } = await import("./mocks/router");
     const { useAuthStore } = await import("@/store/authStore");
+    const { useUiStore } = await import("@/store/uiStore");
 
     resetRouter();
     // The auth store persists to localStorage, so state would otherwise leak
     // from one test into the next.
     localStorage.clear();
     useAuthStore.setState({ user: null, token: null });
+    useUiStore.setState({ mobileNavOpen: false });
 });
 
 afterEach(() => {

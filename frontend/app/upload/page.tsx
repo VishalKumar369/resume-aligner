@@ -188,7 +188,7 @@ export default function UploadPage() {
         (currentStep === 2 && !jd && !jdText.trim());
 
     return (
-        <div className="min-h-screen bg-background flex flex-col items-center justify-center p-6 relative overflow-hidden">
+        <div className="min-h-screen bg-background flex flex-col items-center justify-center p-4 sm:p-6 relative overflow-hidden">
             <div className="absolute -top-40 -left-40 w-[500px] h-[500px] rounded-full bg-primary/5 blur-[120px]" />
             <div className="max-w-2xl w-full">
                 {/* Stepper */}
@@ -225,7 +225,7 @@ export default function UploadPage() {
                     >
                         {/* ---------------------------------------------- step 1 */}
                         {currentStep === 1 && (
-                            <div className="card-elevated rounded-2xl p-8">
+                            <div className="card-elevated rounded-2xl p-6 sm:p-8">
                                 <h2 className="text-2xl font-bold mb-2">Upload your resume</h2>
                                 <p className="text-muted-foreground text-sm mb-6">
                                     We&apos;ll parse it and show you exactly what we extracted before going further.
@@ -278,7 +278,7 @@ export default function UploadPage() {
 
                         {/* ---------------------------------------------- step 2 */}
                         {currentStep === 2 && (
-                            <div className="card-elevated rounded-2xl p-8">
+                            <div className="card-elevated rounded-2xl p-6 sm:p-8">
                                 <h2 className="text-2xl font-bold mb-2">
                                     {jd ? "Verify the role & company" : "Add the job description"}
                                 </h2>
@@ -372,7 +372,7 @@ export default function UploadPage() {
 
                         {/* ---------------------------------------------- step 3 */}
                         {currentStep === 3 && alignment && (
-                            <div className="card-elevated rounded-2xl p-8 space-y-4">
+                            <div className="card-elevated rounded-2xl p-6 sm:p-8 space-y-4">
                                 <h2 className="text-2xl font-bold">Alignment</h2>
 
                                 {alignment.extraction_health && !alignment.extraction_health.resume_ok && (
@@ -505,7 +505,7 @@ export default function UploadPage() {
 
                         {/* ---------------------------------------------- step 4 */}
                         {currentStep === 4 && optimization && (
-                            <div className="card-elevated rounded-2xl p-8 space-y-4">
+                            <div className="card-elevated rounded-2xl p-6 sm:p-8 space-y-4">
                                 <div className="flex items-start justify-between">
                                     <div>
                                         <h2 className="text-2xl font-bold">Resume optimized</h2>
@@ -617,7 +617,7 @@ export default function UploadPage() {
 
                         {/* ---------------------------------------------- step 5 */}
                         {currentStep === 5 && (
-                            <div className="card-elevated rounded-2xl p-8 text-center">
+                            <div className="card-elevated rounded-2xl p-6 sm:p-8 text-center">
                                 <div className="w-20 h-20 rounded-full bg-primary/10 flex items-center justify-center mx-auto mb-6">
                                     <CheckCircle className="w-10 h-10 text-primary" />
                                 </div>

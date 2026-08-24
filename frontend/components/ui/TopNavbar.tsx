@@ -1,11 +1,12 @@
 "use client";
 
 import { useEffect, useRef, useState } from "react";
-import { Bell, Search, User, Plus, LogOut } from "lucide-react";
+import { Bell, Search, User, Plus, LogOut, Menu } from "lucide-react";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { motion } from "framer-motion";
 import { useAuthStore } from "@/store/authStore";
+import { useUiStore } from "@/store/uiStore";
 import { ThemeToggle } from "@/components/ui/ThemeToggle";
 
 const PLATFORM_NAME = process.env.NEXT_PUBLIC_PLATFORM_NAME || "Resume JD Aligner";
@@ -22,6 +23,7 @@ export function TopNavbar({ title }: { title?: string }) {
     const router = useRouter();
     const clearAuth = useAuthStore((state) => state.clearAuth);
     const user = useAuthStore((state) => state.user);
+    const openMobileNav = useUiStore((state) => state.openMobileNav);
     const [showProfileMenu, setShowProfileMenu] = useState(false);
     const menuRef = useRef<HTMLDivElement>(null);
 
@@ -47,10 +49,17 @@ export function TopNavbar({ title }: { title?: string }) {
     };
 
     return (
-        <header className="h-16 flex items-center justify-between px-6 border-b border-border bg-card/80 backdrop-blur-sm sticky top-0 z-40">
-            <div className="flex items-center gap-4">
+        <header className="h-16 flex items-center justify-between gap-2 px-4 sm:px-6 border-b border-border bg-card/80 backdrop-blur-sm sticky top-0 z-40">
+            <div className="flex items-center gap-2 sm:gap-3 min-w-0">
+                <button
+                    onClick={openMobileNav}
+                    aria-label="Open menu"
+                    className="md:hidden p-2 rounded-lg text-muted hover:text-foreground hover:bg-surface-2 transition-colors flex-shrink-0"
+                >
+                    <Menu className="w-5 h-5" />
+                </button>
                 {title && (
-                    <h1 className="text-lg font-semibold text-foreground">{title}</h1>
+                    <h1 className="text-base sm:text-lg font-semibold text-foreground truncate">{title}</h1>
                 )}
             </div>
 
@@ -61,15 +70,15 @@ export function TopNavbar({ title }: { title?: string }) {
                 <kbd className="ml-auto text-xs bg-surface-2 text-muted px-1.5 py-0.5 rounded border border-border">⌘K</kbd>
             </div>
 
-            <div className="flex items-center gap-3">
+            <div className="flex items-center gap-1.5 sm:gap-3 flex-shrink-0">
                 <Link href="/upload">
                     <motion.button
                         whileHover={{ scale: 1.02 }}
                         whileTap={{ scale: 0.98 }}
-                        className="btn-primary flex items-center gap-2 text-sm py-2"
+                        className="btn-primary flex items-center gap-2 text-sm py-2 px-3 sm:px-5"
                     >
                         <Plus className="w-4 h-4" />
-                        New Analysis
+                        <span className="hidden sm:inline">New Analysis</span>
                     </motion.button>
                 </Link>
 

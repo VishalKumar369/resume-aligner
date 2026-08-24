@@ -3,6 +3,7 @@ import userEvent from "@testing-library/user-event";
 import { describe, expect, it } from "vitest";
 
 import { Sidebar } from "@/components/ui/Sidebar";
+import { useUiStore } from "@/store/uiStore";
 import { setPathname } from "../../mocks/router";
 
 /** The clickable row for a nav label (the styled div inside the link). */
@@ -84,5 +85,40 @@ describe("Sidebar", () => {
         await userEvent.click(screen.getByRole("button"));
 
         expect(screen.getByText("Overview")).toBeInTheDocument();
+    });
+});
+
+describe("Sidebar mobile drawer", () => {
+    it("is not shown by default", () => {
+        render(<Sidebar />);
+        expect(screen.queryByRole("button", { name: /close menu/i })).toBeNull();
+    });
+
+    it("renders the drawer when the mobile nav is opened", () => {
+        useUiStore.setState({ mobileNavOpen: true });
+        render(<Sidebar />);
+
+        expect(screen.getByRole("button", { name: /close menu/i })).toBeInTheDocument();
+        // The nav is present in both the desktop rail and the open drawer.
+        expect(screen.getAllByText("Overview")).toHaveLength(2);
+    });
+
+    it("closes on the close button", async () => {
+        useUiStore.setState({ mobileNavOpen: true });
+        render(<Sidebar />);
+
+        await userEvent.click(screen.getByRole("button", { name: /close menu/i }));
+
+        expect(useUiStore.getState().mobileNavOpen).toBe(false);
+    });
+
+    it("closes after tapping a drawer link", async () => {
+        useUiStore.setState({ mobileNavOpen: true });
+        render(<Sidebar />);
+
+        // Index 1 is the drawer's copy; its links close the drawer on navigate.
+        await userEvent.click(screen.getAllByText("Skill Gaps")[1]);
+
+        expect(useUiStore.getState().mobileNavOpen).toBe(false);
     });
 });
