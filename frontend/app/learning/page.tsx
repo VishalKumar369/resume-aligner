@@ -39,8 +39,9 @@ export default function LearningPage() {
     if (error) return <div className="max-w-3xl mx-auto"><ErrorState message={error} onRetry={reload} /></div>;
 
     const modules: any[] = data?.modules || [];
+    const partials: any[] = data?.partial_skills || [];
 
-    if (!modules.length) {
+    if (!modules.length && !partials.length) {
         return (
             <div className="max-w-3xl mx-auto pt-10">
                 <EmptyState
@@ -61,26 +62,33 @@ export default function LearningPage() {
                 </p>
             </div>
 
-            <div className="card-elevated rounded-2xl p-5">
-                <div className="flex items-center justify-between mb-3">
-                    <span className="text-sm font-medium">Overall Progress</span>
-                    <span className="text-sm font-bold text-primary">{completed.size}/{modules.length} modules</span>
+            {modules.length > 0 && (
+                <div className="card-elevated rounded-2xl p-5">
+                    <div className="flex items-center justify-between mb-3">
+                        <span className="text-sm font-medium">Overall Progress</span>
+                        <span className="text-sm font-bold text-primary">{completed.size}/{modules.length} modules</span>
+                    </div>
+                    <div className="h-2 bg-border rounded-full overflow-hidden">
+                        <motion.div
+                            initial={{ width: 0 }}
+                            animate={{ width: `${(completed.size / modules.length) * 100}%` }}
+                            transition={{ duration: 0.5 }}
+                            className="h-full bg-primary rounded-full"
+                        />
+                    </div>
+                    <p className="text-xs text-muted mt-2">Progress is tracked in your browser for now.</p>
                 </div>
-                <div className="h-2 bg-border rounded-full overflow-hidden">
-                    <motion.div
-                        initial={{ width: 0 }}
-                        animate={{ width: `${(completed.size / modules.length) * 100}%` }}
-                        transition={{ duration: 0.5 }}
-                        className="h-full bg-primary rounded-full"
-                    />
-                </div>
-                <p className="text-xs text-muted mt-2">Progress is tracked in your browser for now.</p>
-            </div>
+            )}
 
             <div className="space-y-3">
                 {modules.map((module, i) => {
                     const isOpen = expandedIndex === i;
                     const isDone = completed.has(i);
+                    // Each resource carries the skill it documents, so a skill chip
+                    // can link straight to its official docs.
+                    const docsBySkill = new Map<string, any>(
+                        (module.resources || []).map((r: any) => [r.skill, r])
+                    );
 
                     return (
                         <motion.div
@@ -123,19 +131,39 @@ export default function LearningPage() {
                             {isOpen && (
                                 <div className="px-5 pb-5 space-y-3 border-t border-border/50 pt-4">
                                     <div>
-                                        <p className="text-xs text-muted mb-2">Skills in this module</p>
+                                        <p className="text-xs text-muted mb-2">
+                                            Skills in this module
+                                            {docsBySkill.size > 0 && <span className="text-muted"> · tap one to open its docs</span>}
+                                        </p>
                                         <div className="flex flex-wrap gap-2">
-                                            {module.skills.map((skill: string) => (
-                                                <span key={skill} className={cn("px-2.5 py-1 rounded-lg border text-xs", priorityColor[module.priority] || priorityColor.P3)}>
-                                                    {skill}
-                                                </span>
-                                            ))}
+                                            {module.skills.map((skill: string) => {
+                                                const doc = docsBySkill.get(skill);
+                                                const chip = cn(
+                                                    "px-2.5 py-1 rounded-lg border text-xs inline-flex items-center gap-1",
+                                                    priorityColor[module.priority] || priorityColor.P3
+                                                );
+                                                return doc ? (
+                                                    <a
+                                                        key={skill}
+                                                        href={doc.url}
+                                                        target="_blank"
+                                                        rel="noopener noreferrer"
+                                                        title={`Open ${doc.title}`}
+                                                        className={cn(chip, "hover:opacity-80 transition-opacity")}
+                                                    >
+                                                        {skill}
+                                                        <ExternalLink className="w-3 h-3 opacity-70" />
+                                                    </a>
+                                                ) : (
+                                                    <span key={skill} className={chip}>{skill}</span>
+                                                );
+                                            })}
                                         </div>
                                     </div>
 
                                     {module.resources?.length > 0 && (
                                         <div>
-                                            <p className="text-xs text-muted mb-2">Official documentation</p>
+                                            <p className="text-xs text-muted mb-2">Learn more</p>
                                             <div className="space-y-1.5">
                                                 {module.resources.map((resource: any) => (
                                                     <a
@@ -158,6 +186,50 @@ export default function LearningPage() {
                     );
                 })}
             </div>
+
+            {partials.length > 0 && (
+                <motion.div
+                    initial={{ opacity: 0, y: 10 }}
+                    animate={{ opacity: 1, y: 0 }}
+                    className="card-elevated rounded-2xl p-5"
+                >
+                    <h3 className="text-sm font-semibold text-warning">Partially covered</h3>
+                    <p className="text-xs text-muted mt-0.5 mb-3">
+                        Skills you partly cover — worth reinforcing before they become gaps.
+                    </p>
+                    <div className="space-y-1">
+                        {partials.map((p) => (
+                            <div
+                                key={p.skill}
+                                className="flex items-center justify-between gap-3 py-2 border-b border-border/40 last:border-0"
+                            >
+                                <div className="min-w-0">
+                                    <span className="text-sm font-medium">{p.skill}</span>
+                                    {p.covered_by && (
+                                        <span className="text-xs text-muted"> · you have {p.covered_by}</span>
+                                    )}
+                                </div>
+                                <div className="flex items-center gap-3 flex-shrink-0">
+                                    <span className="text-xs text-muted">
+                                        {p.jd_count} role{p.jd_count === 1 ? "" : "s"}
+                                    </span>
+                                    {p.resource && (
+                                        <a
+                                            href={p.resource.url}
+                                            target="_blank"
+                                            rel="noopener noreferrer"
+                                            title={`Open ${p.resource.title}`}
+                                            className="text-xs text-primary hover:underline inline-flex items-center gap-1"
+                                        >
+                                            Docs <ExternalLink className="w-3 h-3" />
+                                        </a>
+                                    )}
+                                </div>
+                            </div>
+                        ))}
+                    </div>
+                </motion.div>
+            )}
         </div>
     );
 }

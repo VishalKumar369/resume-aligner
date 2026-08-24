@@ -99,6 +99,8 @@ class LearningRoadmapSchema(BaseModel):
     total_modules: int = 0
     resources: List[Dict[str, str]] = []
     skills_covered: List[str] = []
+    # Skills you partly cover (with what covers them and their docs).
+    partial_skills: List[Dict[str, Any]] = []
     jds_considered: int = 0
     note: Optional[str] = None
 

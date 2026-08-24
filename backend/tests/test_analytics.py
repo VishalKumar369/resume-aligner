@@ -308,6 +308,39 @@ class TestLearningRoadmap:
         assert roadmap["total_modules"] >= 1
         assert "Kubernetes" in roadmap["skills_covered"]
 
+    @pytest.mark.asyncio
+    async def test_ai_ml_concepts_carry_doc_links(self):
+        report = SkillGapAggregator().aggregate([analysis([gap("LLM"), gap("NLP")])])
+        roadmap = await LearningRoadmapService().generate(report)
+
+        skills_with_docs = {r["skill"] for module in roadmap["modules"] for r in module["resources"]}
+        assert {"LLM", "NLP"} <= skills_with_docs
+
+    @pytest.mark.asyncio
+    async def test_surfaces_partially_covered_skills_with_docs(self):
+        report = SkillGapAggregator().aggregate([
+            analysis([], [{"skill": "Kubernetes", "covered_by": "Docker"}]),
+            analysis([], [{"skill": "Kubernetes", "covered_by": "Docker"}]),
+        ])
+        roadmap = await LearningRoadmapService().generate(report)
+
+        partial = roadmap["partial_skills"]
+        assert len(partial) == 1
+        assert partial[0]["skill"] == "Kubernetes"
+        assert partial[0]["covered_by"] == "Docker"
+        assert partial[0]["jd_count"] == 2
+        assert partial[0]["resource"]["url"].startswith("https://kubernetes.io")
+
+    @pytest.mark.asyncio
+    async def test_partial_skills_appear_even_with_no_hard_gaps(self):
+        report = SkillGapAggregator().aggregate([
+            analysis([], [{"skill": "Kafka", "covered_by": "RabbitMQ"}]),
+        ])
+        roadmap = await LearningRoadmapService().generate(report)
+
+        assert roadmap["modules"] == []
+        assert [p["skill"] for p in roadmap["partial_skills"]] == ["Kafka"]
+
 
 class TestDashboardMetrics:
     def _run(self, jd_id, alignment, ats, missing=None):
