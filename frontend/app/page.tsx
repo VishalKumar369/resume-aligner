@@ -115,12 +115,12 @@ export default function LandingPage() {
 
             {/* Navbar */}
             <nav className={`fixed top-0 left-0 right-0 z-50 transition-all duration-300 ${scrolled ? "glass border-b border-border/60" : "bg-transparent"}`}>
-                <div className="max-w-7xl mx-auto px-6 h-16 flex items-center justify-between">
-                    <div className="flex items-center gap-2">
-                        <div className="w-8 h-8 rounded-lg bg-primary flex items-center justify-center shadow-glow-sm">
+                <div className="max-w-7xl mx-auto px-4 sm:px-6 h-16 flex items-center justify-between gap-2">
+                    <div className="flex items-center gap-2 min-w-0">
+                        <div className="w-8 h-8 rounded-lg bg-primary flex items-center justify-center shadow-glow-sm flex-shrink-0">
                             <FileText className="w-4 h-4 text-primary-foreground" />
                         </div>
-                        <span className="font-bold">{PLATFORM_NAME}</span>
+                        <span className="font-bold text-sm sm:text-base whitespace-nowrap truncate">{PLATFORM_NAME}</span>
                     </div>
                     <div className="hidden md:flex items-center gap-8 text-sm text-muted-foreground">
                         <a href="#features" className="hover:text-foreground transition-colors">Features</a>
@@ -128,10 +128,13 @@ export default function LandingPage() {
                         <a href="#compare" className="hover:text-foreground transition-colors">Compare</a>
                         <a href="#faq" className="hover:text-foreground transition-colors">FAQ</a>
                     </div>
-                    <div className="flex items-center gap-2 sm:gap-3">
+                    <div className="flex items-center gap-1.5 sm:gap-3 flex-shrink-0">
                         <ThemeToggle />
                         <Link href="/auth/login" className="btn-ghost text-sm hidden sm:inline-flex">Sign in</Link>
-                        <Link href="/auth/signup" className="btn-primary text-sm">Get started free</Link>
+                        <Link href="/auth/signup" className="btn-primary text-sm whitespace-nowrap px-3.5 sm:px-5">
+                            <span className="sm:hidden">Sign up</span>
+                            <span className="hidden sm:inline">Get started free</span>
+                        </Link>
                     </div>
                 </div>
             </nav>
@@ -168,12 +171,12 @@ export default function LandingPage() {
                         </motion.div>
 
                         <motion.h1 variants={fadeUp} transition={{ duration: 0.6 }}
-                            className="text-5xl md:text-7xl font-bold tracking-tight mb-6 leading-[1.05] text-balance">
+                            className="text-[2.5rem] sm:text-6xl md:text-7xl font-bold tracking-tight mb-6 leading-[1.08] sm:leading-[1.05] text-balance">
                             Your resume, <span className="gradient-text">perfectly aligned</span> to every job
                         </motion.h1>
 
                         <motion.p variants={fadeUp} transition={{ duration: 0.6 }}
-                            className="text-lg md:text-xl text-muted-foreground max-w-2xl mx-auto mb-10 leading-relaxed text-balance">
+                            className="text-base sm:text-lg md:text-xl text-muted-foreground max-w-2xl mx-auto mb-10 leading-relaxed text-balance">
                             Stop guessing why you&apos;re not getting callbacks. Get your ATS score, skill-gap analysis, and an AI-optimized resume tailored to each company — in under 60 seconds.
                         </motion.p>
 
@@ -273,7 +276,7 @@ export default function LandingPage() {
             </section>
 
             {/* Metrics */}
-            <section className="py-16 border-y border-border/60 bg-surface/30">
+            <section className="py-12 sm:py-16 border-y border-border/60 bg-surface/30">
                 <div className="max-w-5xl mx-auto px-6 grid grid-cols-2 md:grid-cols-4 gap-8 text-center">
                     {metrics.map((m, i) => (
                         <motion.div key={m.label} initial={{ opacity: 0, y: 20 }} whileInView={{ opacity: 1, y: 0 }}
@@ -288,7 +291,7 @@ export default function LandingPage() {
             </section>
 
             {/* Features */}
-            <section id="features" className="py-24 max-w-7xl mx-auto px-6">
+            <section id="features" className="py-16 sm:py-24 max-w-7xl mx-auto px-6">
                 <SectionHeading
                     chip={<><Star className="w-3.5 h-3.5 text-warning" /> Everything you need to land the job</>}
                     title="Not just another resume builder"
@@ -312,7 +315,7 @@ export default function LandingPage() {
             </section>
 
             {/* How it works */}
-            <section id="how-it-works" className="py-24 bg-surface/40 border-y border-border/60 relative overflow-hidden">
+            <section id="how-it-works" className="py-16 sm:py-24 bg-surface/40 border-y border-border/60 relative overflow-hidden">
                 <div className="absolute inset-0 grid-bg opacity-40" />
                 <div className="max-w-5xl mx-auto px-6 relative">
                     <SectionHeading title="From upload to offer — in minutes" subtitle="Four simple steps to a recruiter-grade resume." />
@@ -336,7 +339,7 @@ export default function LandingPage() {
             </section>
 
             {/* Comparison */}
-            <section id="compare" className="py-24 max-w-5xl mx-auto px-6">
+            <section id="compare" className="py-16 sm:py-24 max-w-5xl mx-auto px-6">
                 <SectionHeading title="Built differently. For results." subtitle="How we compare to traditional resume builders." />
                 <motion.div initial={{ opacity: 0, y: 24 }} whileInView={{ opacity: 1, y: 0 }} viewport={{ once: true }}
                     className="card-elevated rounded-2xl overflow-hidden">
@@ -368,7 +371,7 @@ export default function LandingPage() {
             </section>
 
             {/* FAQ */}
-            <section id="faq" className="py-24 max-w-3xl mx-auto px-6">
+            <section id="faq" className="py-16 sm:py-24 max-w-3xl mx-auto px-6">
                 <SectionHeading
                     chip={<><Shield className="w-3.5 h-3.5 text-primary" /> Honest by design</>}
                     title="Questions, answered"
@@ -391,7 +394,7 @@ export default function LandingPage() {
             </section>
 
             {/* CTA */}
-            <section className="py-24 relative overflow-hidden">
+            <section className="py-16 sm:py-24 relative overflow-hidden">
                 <div className="absolute inset-0 aurora" />
                 <div className="absolute inset-0 grid-bg opacity-40" />
                 <motion.div initial={{ opacity: 0, y: 24 }} whileInView={{ opacity: 1, y: 0 }} viewport={{ once: true }}
@@ -400,8 +403,8 @@ export default function LandingPage() {
                         className="inline-flex p-4 rounded-2xl bg-primary/10 border border-primary/20 mb-6">
                         <Rocket className="w-8 h-8 text-primary" />
                     </motion.div>
-                    <h2 className="text-4xl md:text-5xl font-bold mb-6 text-balance">Start landing more interviews today</h2>
-                    <p className="text-lg md:text-xl text-muted-foreground mb-10 text-balance">
+                    <h2 className="text-3xl sm:text-4xl md:text-5xl font-bold mb-6 text-balance">Start landing more interviews today</h2>
+                    <p className="text-base sm:text-lg md:text-xl text-muted-foreground mb-10 text-balance">
                         Join candidates who use {PLATFORM_NAME} to apply smarter and get shortlisted faster.
                     </p>
                     <Link href="/auth/signup">
@@ -439,13 +442,13 @@ export default function LandingPage() {
 function SectionHeading({ chip, title, subtitle }: { chip?: React.ReactNode; title: string; subtitle: string }) {
     return (
         <motion.div initial={{ opacity: 0, y: 20 }} whileInView={{ opacity: 1, y: 0 }} viewport={{ once: true }}
-            className="text-center mb-14">
+            className="text-center mb-10 sm:mb-14">
             {chip && (
                 <div className="inline-flex items-center gap-2 bg-surface border border-border rounded-full px-4 py-1.5 text-sm text-muted mb-4">
                     {chip}
                 </div>
             )}
-            <h2 className="text-4xl md:text-5xl font-bold mb-4 text-balance">{title}</h2>
+            <h2 className="text-3xl sm:text-4xl md:text-5xl font-bold mb-4 text-balance">{title}</h2>
             <p className="text-muted-foreground max-w-xl mx-auto text-balance">{subtitle}</p>
         </motion.div>
     );
