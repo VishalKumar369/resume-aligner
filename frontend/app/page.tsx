@@ -3,6 +3,7 @@
 import { motion } from "framer-motion";
 import { ArrowRight, CheckCircle, Zap, Target, BarChart3, Brain, Rocket, Shield, Star, ChevronRight, FileText, TrendingUp, Award } from "lucide-react";
 import Link from "next/link";
+import { ThemeToggle } from "@/components/ui/ThemeToggle";
 
 const PLATFORM_NAME = process.env.NEXT_PUBLIC_PLATFORM_NAME || "Resume JD Aligner";
 
@@ -76,25 +77,50 @@ const metrics = [
     { value: "50+", label: "Company Profiles" },
 ];
 
+const faqs = [
+    {
+        q: "Is it really free?",
+        a: "Yes. The core analysis — ATS scoring, JD alignment, and skill-gap detection — is free, with no credit card required.",
+    },
+    {
+        q: "Does it work with any job description?",
+        a: "Paste any posting. We parse the role, company, requirements, and responsibilities, then score your resume against them.",
+    },
+    {
+        q: "Will it invent experience I don't have?",
+        a: "Never. Rewrites are fact-guarded: we rephrase and surface what's already in your resume, and block anything that would add claims you can't back up.",
+    },
+    {
+        q: "What files can I upload?",
+        a: "PDF and DOCX up to 5MB. We show you exactly what we parsed before scoring, so you can catch a bad extraction early.",
+    },
+    {
+        q: "Is my data private?",
+        a: "Your resume and job descriptions are scoped to your account and used only to generate your own analysis.",
+    },
+];
+
 export default function LandingPage() {
     return (
-        <div className="min-h-screen bg-background text-white overflow-x-hidden">
+        <div className="min-h-screen bg-background text-foreground overflow-x-hidden">
             {/* Navbar */}
             <nav className="fixed top-0 left-0 right-0 z-50 glass border-b border-border/50">
                 <div className="max-w-7xl mx-auto px-6 h-16 flex items-center justify-between">
                     <div className="flex items-center gap-2">
                         <div className="w-8 h-8 rounded-lg bg-primary flex items-center justify-center">
-                            <FileText className="w-4 h-4 text-white" />
+                            <FileText className="w-4 h-4 text-primary-foreground" />
                         </div>
-                        <span className="font-bold text-white">{PLATFORM_NAME}</span>
+                        <span className="font-bold text-foreground">{PLATFORM_NAME}</span>
                     </div>
                     <div className="hidden md:flex items-center gap-8 text-sm text-muted-foreground">
-                        <a href="#features" className="hover:text-white transition-colors">Features</a>
-                        <a href="#how-it-works" className="hover:text-white transition-colors">How it works</a>
-                        <a href="#compare" className="hover:text-white transition-colors">Compare</a>
+                        <a href="#features" className="hover:text-foreground transition-colors">Features</a>
+                        <a href="#how-it-works" className="hover:text-foreground transition-colors">How it works</a>
+                        <a href="#compare" className="hover:text-foreground transition-colors">Compare</a>
+                        <a href="#faq" className="hover:text-foreground transition-colors">FAQ</a>
                     </div>
-                    <div className="flex items-center gap-3">
-                        <Link href="/auth/login" className="btn-ghost text-sm">Sign in</Link>
+                    <div className="flex items-center gap-2 sm:gap-3">
+                        <ThemeToggle />
+                        <Link href="/auth/login" className="btn-ghost text-sm hidden sm:inline-flex">Sign in</Link>
                         <Link href="/auth/signup" className="btn-primary text-sm">Get started free</Link>
                     </div>
                 </div>
@@ -143,7 +169,7 @@ export default function LandingPage() {
                                     <ArrowRight className="w-4 h-4" />
                                 </motion.button>
                             </Link>
-                            <Link href="#how-it-works" className="flex items-center gap-2 text-muted-foreground hover:text-white transition-colors text-sm">
+                            <Link href="#how-it-works" className="flex items-center gap-2 text-muted-foreground hover:text-foreground transition-colors text-sm">
                                 See how it works <ChevronRight className="w-4 h-4" />
                             </Link>
                         </div>
@@ -260,7 +286,7 @@ export default function LandingPage() {
                             <div className={`inline-flex p-3 rounded-xl ${feature.bg} mb-4`}>
                                 <feature.icon className={`w-5 h-5 ${feature.color}`} />
                             </div>
-                            <h3 className="font-semibold text-white mb-2">{feature.title}</h3>
+                            <h3 className="font-semibold text-foreground mb-2">{feature.title}</h3>
                             <p className="text-sm text-muted-foreground leading-relaxed">{feature.description}</p>
                         </motion.div>
                     ))}
@@ -330,6 +356,36 @@ export default function LandingPage() {
                 </motion.div>
             </section>
 
+            {/* FAQ */}
+            <section id="faq" className="py-24 max-w-3xl mx-auto px-6">
+                <motion.div initial={{ opacity: 0, y: 20 }} whileInView={{ opacity: 1, y: 0 }} viewport={{ once: true }} className="text-center mb-12">
+                    <div className="inline-flex items-center gap-2 bg-surface border border-border rounded-full px-4 py-1.5 text-sm text-muted mb-4">
+                        <Shield className="w-3.5 h-3.5 text-primary" />
+                        <span>Honest by design</span>
+                    </div>
+                    <h2 className="text-4xl font-bold mb-4">Questions, answered</h2>
+                    <p className="text-muted-foreground">Everything you need to know before you start.</p>
+                </motion.div>
+                <div className="space-y-3">
+                    {faqs.map((faq, i) => (
+                        <motion.details
+                            key={faq.q}
+                            initial={{ opacity: 0, y: 12 }}
+                            whileInView={{ opacity: 1, y: 0 }}
+                            transition={{ delay: i * 0.05 }}
+                            viewport={{ once: true }}
+                            className="card-elevated rounded-2xl p-5 group"
+                        >
+                            <summary className="flex items-center justify-between gap-4 cursor-pointer font-medium list-none">
+                                {faq.q}
+                                <ChevronRight className="w-4 h-4 text-muted flex-shrink-0 transition-transform group-open:rotate-90" />
+                            </summary>
+                            <p className="text-sm text-muted-foreground mt-3 leading-relaxed">{faq.a}</p>
+                        </motion.details>
+                    ))}
+                </div>
+            </section>
+
             {/* CTA Section */}
             <section className="py-24 relative overflow-hidden">
                 <div className="absolute inset-0 bg-gradient-to-br from-primary/10 via-transparent to-accent/10" />
@@ -361,15 +417,15 @@ export default function LandingPage() {
                 <div className="max-w-7xl mx-auto px-6 flex flex-col md:flex-row items-center justify-between gap-4">
                     <div className="flex items-center gap-2">
                         <div className="w-6 h-6 rounded-md bg-primary flex items-center justify-center">
-                            <FileText className="w-3 h-3 text-white" />
+                            <FileText className="w-3 h-3 text-primary-foreground" />
                         </div>
                         <span className="font-semibold text-sm">{PLATFORM_NAME}</span>
                     </div>
-                    <p className="text-sm text-muted">© 2025 {PLATFORM_NAME}. All rights reserved.</p>
+                    <p className="text-sm text-muted">© 2026 {PLATFORM_NAME}. All rights reserved.</p>
                     <div className="flex items-center gap-6 text-sm text-muted">
-                        <a href="#" className="hover:text-white transition-colors">Privacy</a>
-                        <a href="#" className="hover:text-white transition-colors">Terms</a>
-                        <a href="#" className="hover:text-white transition-colors">Contact</a>
+                        <a href="#" className="hover:text-foreground transition-colors">Privacy</a>
+                        <a href="#" className="hover:text-foreground transition-colors">Terms</a>
+                        <a href="#" className="hover:text-foreground transition-colors">Contact</a>
                     </div>
                 </div>
             </footer>

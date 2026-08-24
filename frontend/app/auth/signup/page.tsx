@@ -83,7 +83,7 @@ export default function SignupPage() {
                 <motion.div initial={{ opacity: 0, x: -20 }} animate={{ opacity: 1, x: 0 }} transition={{ duration: 0.5 }}>
                     <Link href="/" className="inline-flex items-center gap-2 mb-10">
                         <div className="w-9 h-9 rounded-xl bg-primary flex items-center justify-center">
-                            <FileText className="w-5 h-5 text-white" />
+                            <FileText className="w-5 h-5 text-foreground" />
                         </div>
                         <span className="font-bold text-lg">{PLATFORM_NAME}</span>
                     </Link>
@@ -138,7 +138,7 @@ export default function SignupPage() {
                                     <button
                                         type="button"
                                         onClick={() => setShowPassword(!showPassword)}
-                                        className="absolute right-4 top-1/2 -translate-y-1/2 text-muted hover:text-white transition-colors"
+                                        className="absolute right-4 top-1/2 -translate-y-1/2 text-muted hover:text-foreground transition-colors"
                                     >
                                         {showPassword ? <EyeOff className="w-4 h-4" /> : <Eye className="w-4 h-4" />}
                                     </button>

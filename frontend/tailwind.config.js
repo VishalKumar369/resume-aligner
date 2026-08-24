@@ -7,25 +7,29 @@ module.exports = {
     ],
     theme: {
         extend: {
+            // Colours resolve to CSS variables (space-separated RGB channels), so
+            // opacity modifiers still work and the light/dark themes swap the
+            // variables rather than the class names. See app/globals.css.
             colors: {
-                background: "#0A0A0F",
-                card: "#111118",
-                border: "#1E1E2E",
+                background: "rgb(var(--background) / <alpha-value>)",
+                foreground: "rgb(var(--foreground) / <alpha-value>)",
+                card: "rgb(var(--card) / <alpha-value>)",
+                border: "rgb(var(--border) / <alpha-value>)",
                 primary: {
-                    DEFAULT: "#6366F1",
-                    hover: "#4F46E5",
-                    foreground: "#FFFFFF",
+                    DEFAULT: "rgb(var(--primary) / <alpha-value>)",
+                    hover: "rgb(var(--primary-hover) / <alpha-value>)",
+                    foreground: "rgb(var(--primary-foreground) / <alpha-value>)",
                 },
-                accent: "#A78BFA",
+                accent: "rgb(var(--accent) / <alpha-value>)",
                 muted: {
-                    DEFAULT: "#71717A",
-                    foreground: "#A1A1AA",
+                    DEFAULT: "rgb(var(--muted) / <alpha-value>)",
+                    foreground: "rgb(var(--muted-foreground) / <alpha-value>)",
                 },
-                success: "#22C55E",
-                warning: "#F59E0B",
-                error: "#EF4444",
-                surface: "#16161F",
-                "surface-2": "#1C1C28",
+                success: "rgb(var(--success) / <alpha-value>)",
+                warning: "rgb(var(--warning) / <alpha-value>)",
+                error: "rgb(var(--error) / <alpha-value>)",
+                surface: "rgb(var(--surface) / <alpha-value>)",
+                "surface-2": "rgb(var(--surface-2) / <alpha-value>)",
             },
             fontFamily: {
                 sans: ["Inter", "system-ui", "sans-serif"],

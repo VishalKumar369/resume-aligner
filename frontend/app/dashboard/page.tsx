@@ -86,7 +86,7 @@ export default function DashboardPage() {
     return (
         <motion.div initial={{ opacity: 0 }} animate={{ opacity: 1 }} className="space-y-6 max-w-7xl mx-auto">
             <div>
-                <h1 className="text-2xl font-bold text-white">Career Intelligence Dashboard</h1>
+                <h1 className="text-2xl font-bold text-foreground">Career Intelligence Dashboard</h1>
                 <p className="text-sm text-muted mt-1">
                     {analyses.length} analys{analyses.length === 1 ? "is" : "es"} ·{" "}
                     {uniqueResumes} resume{uniqueResumes === 1 ? "" : "s"} ·{" "}
@@ -97,7 +97,7 @@ export default function DashboardPage() {
             {/* Selected-analysis context */}
             <div className="flex flex-wrap items-baseline justify-between gap-2">
                 <div>
-                    <h2 className="text-lg font-semibold text-white">
+                    <h2 className="text-lg font-semibold text-foreground">
                         {active?.company || "Unknown company"}
                         {active?.role ? <span className="text-muted font-normal"> — {active.role}</span> : null}
                     </h2>
@@ -138,7 +138,7 @@ export default function DashboardPage() {
                     transition={{ delay: 0.25 }}
                     className="lg:col-span-2 card-elevated rounded-2xl p-6 flex flex-col lg:h-[440px]"
                 >
-                    <h3 className="text-sm font-semibold text-white mb-4 flex-shrink-0">Recommended Improvements</h3>
+                    <h3 className="text-sm font-semibold text-foreground mb-4 flex-shrink-0">Recommended Improvements</h3>
                     {detailLoading ? (
                         <div className="space-y-3">
                             {[0, 1, 2].map((i) => <Skeleton key={i} className="h-10 rounded-lg" />)}

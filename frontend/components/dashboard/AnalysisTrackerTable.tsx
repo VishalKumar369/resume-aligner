@@ -76,7 +76,7 @@ export function AnalysisTrackerTable({
             className="card-elevated rounded-2xl overflow-hidden"
         >
             <div className="p-5 border-b border-border">
-                <h3 className="text-sm font-semibold text-white">Your Analyses</h3>
+                <h3 className="text-sm font-semibold text-foreground">Your Analyses</h3>
                 <p className="text-xs text-muted mt-0.5">Every run — select one to see it above</p>
             </div>
 

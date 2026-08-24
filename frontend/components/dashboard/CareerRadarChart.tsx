@@ -10,7 +10,7 @@ const CustomTooltip = ({ active, payload }: any) => {
     if (active && payload && payload.length) {
         return (
             <div className="bg-card border border-border rounded-xl px-3 py-2 text-sm">
-                <p className="text-white font-medium">{payload[0].payload.skill}</p>
+                <p className="text-foreground font-medium">{payload[0].payload.skill}</p>
                 <p className="text-primary">{Math.round(payload[0].value)}%</p>
             </div>
         );
@@ -33,15 +33,16 @@ export function CareerRadarChart({ axes, className }: { axes: Axis[]; className?
             className={cn("card-elevated rounded-2xl p-6", className)}
         >
             <div className="mb-4">
-                <h3 className="text-sm font-semibold text-white">Alignment Breakdown</h3>
+                <h3 className="text-sm font-semibold text-foreground">Alignment Breakdown</h3>
                 <p className="text-xs text-muted mt-1">How your latest match scored, component by component</p>
             </div>
 
             {hasEnoughAxes ? (
                 <ResponsiveContainer width="100%" height={280}>
                     <RadarChart data={axes} outerRadius="75%">
-                        <PolarGrid stroke="#1E1E2E" />
-                        <PolarAngleAxis dataKey="skill" tick={{ fill: "#71717A", fontSize: 11 }} />
+                        {/* A translucent neutral so the grid reads on both light and dark. */}
+                        <PolarGrid stroke="rgba(128,128,150,0.25)" />
+                        <PolarAngleAxis dataKey="skill" tick={{ fill: "#8A8A9A", fontSize: 11 }} />
                         <Radar name="Score" dataKey="score" stroke="#6366F1" fill="#6366F1" fillOpacity={0.15} strokeWidth={2} />
                         <Tooltip content={<CustomTooltip />} />
                     </RadarChart>

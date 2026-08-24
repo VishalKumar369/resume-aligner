@@ -66,7 +66,7 @@ export default function CompanyIndexPage() {
     return (
         <motion.div initial={{ opacity: 0 }} animate={{ opacity: 1 }} className="max-w-6xl mx-auto space-y-6">
             <div>
-                <h1 className="text-2xl font-bold text-white">Company Intelligence</h1>
+                <h1 className="text-2xl font-bold text-foreground">Company Intelligence</h1>
                 <p className="text-sm text-muted mt-1">
                     {companies.length} compan{companies.length === 1 ? "y" : "ies"} from your analyzed postings
                 </p>
@@ -90,7 +90,7 @@ export default function CompanyIndexPage() {
                                         <Building2 className="w-5 h-5 text-primary" />
                                     </div>
                                     <div className="min-w-0">
-                                        <p className="font-semibold text-white truncate">{c.company}</p>
+                                        <p className="font-semibold text-foreground truncate">{c.company}</p>
                                         <p className="text-xs text-muted mt-0.5 inline-flex items-center gap-1">
                                             <Briefcase className="w-3 h-3" />
                                             {c.named === false

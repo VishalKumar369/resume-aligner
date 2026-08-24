@@ -46,7 +46,7 @@ export function Sidebar() {
             <div className="h-16 flex items-center px-4 border-b border-border flex-shrink-0">
                 <Link href="/dashboard" className="flex items-center gap-3 overflow-hidden">
                     <div className="w-8 h-8 rounded-lg bg-primary flex items-center justify-center flex-shrink-0">
-                        <FileText className="w-4 h-4 text-white" />
+                        <FileText className="w-4 h-4 text-primary-foreground" />
                     </div>
                     <AnimatePresence>
                         {!collapsed && (
@@ -101,7 +101,7 @@ export function Sidebar() {
                 <button
                     onClick={() => setCollapsed(!collapsed)}
                     className={cn(
-                        "w-full flex items-center gap-3 px-3 py-2 rounded-lg text-muted hover:text-white hover:bg-surface-2 transition-all duration-200",
+                        "w-full flex items-center gap-3 px-3 py-2 rounded-lg text-muted hover:text-foreground hover:bg-surface-2 transition-all duration-200",
                         collapsed && "justify-center"
                     )}
                 >
@@ -131,7 +131,7 @@ function NavLink({ item, collapsed, pathname }: { item: NavItem; collapsed: bool
                     "flex items-center gap-3 px-3 py-2 rounded-lg transition-all duration-200 cursor-pointer group",
                     isActive
                         ? "bg-primary/15 text-primary border border-primary/20"
-                        : "text-muted hover:text-white hover:bg-surface-2",
+                        : "text-muted hover:text-foreground hover:bg-surface-2",
                     collapsed && "justify-center"
                 )}
             >

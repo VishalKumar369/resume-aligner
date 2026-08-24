@@ -369,7 +369,7 @@ function CompanyPageContent() {
                 <>
                     {scoped && (
                         <div className="pt-2">
-                            <h2 className="text-lg font-semibold text-white">Across {insights.company}</h2>
+                            <h2 className="text-lg font-semibold text-foreground">Across {insights.company}</h2>
                             <p className="text-xs text-muted mt-0.5">All roles you&apos;ve saved for this company</p>
                         </div>
                     )}
@@ -519,7 +519,7 @@ function PostingCard({ posting, companyId }: { posting: any; companyId: string }
                 </Link>
                 {posting.url && (
                     <a href={posting.url} target="_blank" rel="noopener noreferrer"
-                        className="text-xs text-muted hover:text-white inline-flex items-center gap-1">
+                        className="text-xs text-muted hover:text-foreground inline-flex items-center gap-1">
                         Open posting <ExternalLink className="w-3 h-3" />
                     </a>
                 )}

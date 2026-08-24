@@ -198,13 +198,13 @@ export default function UploadPage() {
                             <div className="flex flex-col items-center gap-1">
                                 <div className={cn(
                                     "w-9 h-9 rounded-full flex items-center justify-center text-sm font-bold border-2 transition-all duration-300",
-                                    currentStep > step.id ? "bg-primary border-primary text-white" :
+                                    currentStep > step.id ? "bg-primary border-primary text-primary-foreground" :
                                         currentStep === step.id ? "border-primary text-primary bg-primary/10" :
                                             "border-border text-muted bg-transparent"
                                 )}>
                                     {currentStep > step.id ? <CheckCircle className="w-4 h-4" /> : step.id}
                                 </div>
-                                <span className={cn("text-xs whitespace-nowrap hidden sm:block", currentStep === step.id ? "text-white" : "text-muted")}>
+                                <span className={cn("text-xs whitespace-nowrap hidden sm:block", currentStep === step.id ? "text-foreground" : "text-muted")}>
                                     {step.title}
                                 </span>
                             </div>
@@ -489,7 +489,7 @@ export default function UploadPage() {
                                                             : "border-border bg-surface-2 hover:border-primary/40"
                                                     )}
                                                 >
-                                                    <span className={cn("text-sm font-semibold", active ? "text-primary" : "text-white")}>
+                                                    <span className={cn("text-sm font-semibold", active ? "text-primary" : "text-foreground")}>
                                                         {option.title}
                                                     </span>
                                                     <span className="block text-[11px] text-muted mt-1 leading-snug">

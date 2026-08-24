@@ -26,9 +26,14 @@ export default function RootLayout({
 }: {
     children: React.ReactNode;
 }) {
+    // Set the theme class before first paint so there is no flash of the wrong
+    // theme. Reads the saved choice, else the OS preference; defaults to dark.
+    const themeScript = `(function(){try{var t=localStorage.getItem('theme');if(t!=='light'&&t!=='dark'){t=window.matchMedia('(prefers-color-scheme: light)').matches?'light':'dark';}var d=document.documentElement;d.classList.remove('light','dark');d.classList.add(t);}catch(e){}})();`;
+
     return (
-        <html lang="en" className="dark">
+        <html lang="en" suppressHydrationWarning>
             <head>
+                <script dangerouslySetInnerHTML={{ __html: themeScript }} />
                 <link rel="preconnect" href="https://fonts.googleapis.com" />
                 <link rel="preconnect" href="https://fonts.gstatic.com" crossOrigin="anonymous" />
                 <link
@@ -36,15 +41,15 @@ export default function RootLayout({
                     rel="stylesheet"
                 />
             </head>
-            <body className="bg-background text-white antialiased">
+            <body className="bg-background text-foreground antialiased">
                 <RouteGuard>{children}</RouteGuard>
                 <Toaster
                     position="bottom-right"
                     toastOptions={{
                         style: {
-                            background: "#111118",
-                            color: "#FAFAFA",
-                            border: "1px solid #1E1E2E",
+                            background: "rgb(var(--card))",
+                            color: "rgb(var(--foreground))",
+                            border: "1px solid rgb(var(--border))",
                             borderRadius: "12px",
                             fontSize: "14px",
                         },

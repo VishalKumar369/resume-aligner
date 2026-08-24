@@ -6,6 +6,7 @@ import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { motion } from "framer-motion";
 import { useAuthStore } from "@/store/authStore";
+import { ThemeToggle } from "@/components/ui/ThemeToggle";
 
 const PLATFORM_NAME = process.env.NEXT_PUBLIC_PLATFORM_NAME || "Resume JD Aligner";
 
@@ -49,7 +50,7 @@ export function TopNavbar({ title }: { title?: string }) {
         <header className="h-16 flex items-center justify-between px-6 border-b border-border bg-card/80 backdrop-blur-sm sticky top-0 z-40">
             <div className="flex items-center gap-4">
                 {title && (
-                    <h1 className="text-lg font-semibold text-white">{title}</h1>
+                    <h1 className="text-lg font-semibold text-foreground">{title}</h1>
                 )}
             </div>
 
@@ -72,7 +73,9 @@ export function TopNavbar({ title }: { title?: string }) {
                     </motion.button>
                 </Link>
 
-                <button className="relative p-2 rounded-lg text-muted hover:text-white hover:bg-surface-2 transition-colors">
+                <ThemeToggle />
+
+                <button className="relative p-2 rounded-lg text-muted hover:text-foreground hover:bg-surface-2 transition-colors">
                     <Bell className="w-5 h-5" />
                     <span className="absolute top-1.5 right-1.5 w-2 h-2 rounded-full bg-primary" />
                 </button>
@@ -105,7 +108,7 @@ export function TopNavbar({ title }: { title?: string }) {
                                     {initials}
                                 </div>
                                 <div className="min-w-0">
-                                    <p className="text-sm font-medium text-white truncate">{displayName}</p>
+                                    <p className="text-sm font-medium text-foreground truncate">{displayName}</p>
                                     {email && <p className="text-xs text-muted truncate">{email}</p>}
                                 </div>
                             </div>
@@ -115,7 +118,7 @@ export function TopNavbar({ title }: { title?: string }) {
                                     href="/settings"
                                     onClick={() => setShowProfileMenu(false)}
                                     role="menuitem"
-                                    className="flex w-full items-center gap-2.5 px-4 py-2 text-sm text-muted hover:bg-surface-2 hover:text-white transition-colors"
+                                    className="flex w-full items-center gap-2.5 px-4 py-2 text-sm text-muted hover:bg-surface-2 hover:text-foreground transition-colors"
                                 >
                                     <User className="w-4 h-4" />
                                     Account settings

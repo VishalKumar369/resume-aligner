@@ -37,7 +37,7 @@ export function SkillHeatmap({ skills }: { skills: HeatmapSkill[] }) {
         >
             <div className="flex items-center justify-between mb-4 gap-4 flex-wrap">
                 <div>
-                    <h3 className="text-sm font-semibold text-white">Skill Heatmap</h3>
+                    <h3 className="text-sm font-semibold text-foreground">Skill Heatmap</h3>
                     <p className="text-xs text-muted mt-1">Your skills against what your target roles ask for</p>
                 </div>
                 <div className="flex gap-3 flex-wrap justify-end">
