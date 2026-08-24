@@ -50,6 +50,9 @@ module.exports = {
                 shimmer: "shimmer 2s linear infinite",
                 "fade-in": "fadeIn 0.3s ease-out",
                 "slide-up": "slideUp 0.4s ease-out",
+                float: "float 6s ease-in-out infinite",
+                gradient: "gradient 8s ease infinite",
+                "spin-slow": "spin 20s linear infinite",
             },
             keyframes: {
                 shimmer: {
@@ -63,6 +66,14 @@ module.exports = {
                 slideUp: {
                     "0%": { opacity: "0", transform: "translateY(10px)" },
                     "100%": { opacity: "1", transform: "translateY(0)" },
+                },
+                float: {
+                    "0%,100%": { transform: "translateY(0)" },
+                    "50%": { transform: "translateY(-14px)" },
+                },
+                gradient: {
+                    "0%,100%": { backgroundPosition: "0% 50%" },
+                    "50%": { backgroundPosition: "100% 50%" },
                 },
             },
         },
