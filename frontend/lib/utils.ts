@@ -30,3 +30,8 @@ export function getScoreLabel(score: number): string {
 
 export const PLATFORM_NAME =
     process.env.NEXT_PUBLIC_PLATFORM_NAME || "Resume JD Aligner";
+
+/** Deep-link to the learning roadmap, focused on one skill. */
+export function learningLinkForSkill(skill: string): string {
+    return `/learning?skill=${encodeURIComponent(skill)}`;
+}

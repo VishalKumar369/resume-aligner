@@ -7,7 +7,16 @@ import {
     getScoreBg,
     getScoreColor,
     getScoreLabel,
+    learningLinkForSkill,
 } from "@/lib/utils";
+
+describe("learningLinkForSkill", () => {
+    it("deep-links to the roadmap with the skill encoded", () => {
+        expect(learningLinkForSkill("Docker")).toBe("/learning?skill=Docker");
+        expect(learningLinkForSkill("CI/CD")).toBe("/learning?skill=CI%2FCD");
+        expect(learningLinkForSkill("C++")).toBe("/learning?skill=C%2B%2B");
+    });
+});
 
 describe("cn", () => {
     it("joins class names and drops falsy values", () => {

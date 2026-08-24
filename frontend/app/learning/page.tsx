@@ -1,7 +1,8 @@
 "use client";
 
-import { useState } from "react";
+import { Suspense, useEffect, useRef, useState } from "react";
 import { motion } from "framer-motion";
+import { useSearchParams } from "next/navigation";
 import { CheckCircle, Circle, ExternalLink, Clock, ChevronDown, ChevronUp } from "lucide-react";
 import { cn } from "@/lib/utils";
 import { useApi } from "@/hooks/useApi";
@@ -14,10 +15,55 @@ const priorityColor: Record<string, string> = {
     P3: "border-primary text-primary bg-primary/10",
 };
 
+// useSearchParams must sit under a Suspense boundary for the production build.
 export default function LearningPage() {
+    return (
+        <Suspense fallback={<div className="max-w-3xl mx-auto"><Skeleton className="h-8 w-56" /></div>}>
+            <LearningContent />
+        </Suspense>
+    );
+}
+
+function LearningContent() {
     const { data, loading, error, reload } = useApi<any>(() => learningService.getRoadmap());
+    // Optional skill to focus, deep-linked from the skill-gap / company pages.
+    const targetSkill = (useSearchParams().get("skill") || "").trim().toLowerCase();
     const [expandedIndex, setExpandedIndex] = useState<number | null>(0);
     const [completed, setCompleted] = useState<Set<number>>(new Set());
+    // A brief attention flash on arrival, not a persistent selection.
+    const [flash, setFlash] = useState(false);
+    const highlightRef = useRef<HTMLDivElement>(null);
+
+    // Expand the module that teaches the focused skill.
+    useEffect(() => {
+        if (!targetSkill || !data?.modules?.length) return;
+        const idx = data.modules.findIndex((m: any) =>
+            (m.skills || []).some((s: string) => s.toLowerCase() === targetSkill)
+        );
+        if (idx >= 0) setExpandedIndex(idx);
+    }, [targetSkill, data]);
+
+    // Scroll to the focused skill and flash it for a couple of seconds.
+    useEffect(() => {
+        if (!targetSkill || !data) return;
+        const inModule = (data.modules || []).some((m: any) =>
+            (m.skills || []).some((s: string) => s.toLowerCase() === targetSkill)
+        );
+        const inPartial = (data.partial_skills || []).some(
+            (p: any) => (p.skill || "").toLowerCase() === targetSkill
+        );
+        if (!inModule && !inPartial) return;
+
+        setFlash(true);
+        const scroll = setTimeout(
+            () => highlightRef.current?.scrollIntoView({ behavior: "smooth", block: "center" }),
+            250
+        );
+        const clear = setTimeout(() => setFlash(false), 2600);
+        return () => { clearTimeout(scroll); clearTimeout(clear); };
+    }, [targetSkill, expandedIndex, data]);
+
+    const isTarget = (skill: string) => flash && !!targetSkill && skill.toLowerCase() === targetSkill;
 
     const toggleComplete = (i: number) =>
         setCompleted((prev) => {
@@ -40,6 +86,13 @@ export default function LearningPage() {
 
     const modules: any[] = data?.modules || [];
     const partials: any[] = data?.partial_skills || [];
+
+    const targetModuleIndex = targetSkill
+        ? modules.findIndex((m: any) => (m.skills || []).some((s: string) => s.toLowerCase() === targetSkill))
+        : -1;
+    const targetPartialIndex = targetSkill && targetModuleIndex < 0
+        ? partials.findIndex((p: any) => (p.skill || "").toLowerCase() === targetSkill)
+        : -1;
 
     if (!modules.length && !partials.length) {
         return (
@@ -93,10 +146,14 @@ export default function LearningPage() {
                     return (
                         <motion.div
                             key={`${module.module}-${i}`}
+                            ref={i === targetModuleIndex ? highlightRef : undefined}
                             initial={{ opacity: 0, y: 10 }}
                             animate={{ opacity: 1, y: 0 }}
                             transition={{ delay: i * 0.05 }}
-                            className="card-elevated rounded-2xl overflow-hidden"
+                            className={cn(
+                                "card-elevated rounded-2xl overflow-hidden transition-shadow duration-500",
+                                flash && i === targetModuleIndex && "ring-2 ring-primary"
+                            )}
                         >
                             <button
                                 onClick={() => setExpandedIndex(isOpen ? null : i)}
@@ -140,7 +197,8 @@ export default function LearningPage() {
                                                 const doc = docsBySkill.get(skill);
                                                 const chip = cn(
                                                     "px-2.5 py-1 rounded-lg border text-xs inline-flex items-center gap-1",
-                                                    priorityColor[module.priority] || priorityColor.P3
+                                                    priorityColor[module.priority] || priorityColor.P3,
+                                                    isTarget(skill) && "ring-2 ring-primary font-semibold"
                                                 );
                                                 return doc ? (
                                                     <a
@@ -198,13 +256,17 @@ export default function LearningPage() {
                         Skills you partly cover — worth reinforcing before they become gaps.
                     </p>
                     <div className="space-y-1">
-                        {partials.map((p) => (
+                        {partials.map((p, idx) => (
                             <div
                                 key={p.skill}
-                                className="flex items-center justify-between gap-3 py-2 border-b border-border/40 last:border-0"
+                                ref={idx === targetPartialIndex ? highlightRef : undefined}
+                                className={cn(
+                                    "flex items-center justify-between gap-3 py-2 border-b border-border/40 last:border-0 rounded-lg transition-shadow duration-500",
+                                    flash && idx === targetPartialIndex && "ring-2 ring-primary px-2 -mx-2"
+                                )}
                             >
                                 <div className="min-w-0">
-                                    <span className="text-sm font-medium">{p.skill}</span>
+                                    <span className={cn("text-sm font-medium", isTarget(p.skill) && "text-primary")}>{p.skill}</span>
                                     {p.covered_by && (
                                         <span className="text-xs text-muted"> · you have {p.covered_by}</span>
                                     )}

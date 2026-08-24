@@ -1,12 +1,14 @@
 "use client";
 
 import { motion } from "framer-motion";
-import { AlertCircle, BarChart3, Layers } from "lucide-react";
+import Link from "next/link";
+import { AlertCircle, BarChart3, Layers, BookOpen } from "lucide-react";
 import { StatCard } from "@/components/ui/StatCard";
 import { SkillHeatmap, HeatmapSkill } from "@/components/dashboard/SkillHeatmap";
 import { EmptyState, ErrorState, PriorityBadge, Skeleton, StatSkeletonRow } from "@/components/ui/States";
 import { useApi } from "@/hooks/useApi";
 import { dashboardService } from "@/services/api";
+import { learningLinkForSkill } from "@/lib/utils";
 
 export default function SkillsPage() {
     const { data, loading, error, reload } = useApi<any>(() => dashboardService.getSummary());
@@ -69,7 +71,7 @@ export default function SkillsPage() {
                 <StatCard title="Bonus Gaps" value={counts.P3} icon={Layers} subtitle="nice-to-haves" />
             </div>
 
-            <SkillHeatmap skills={heatmap} />
+            <SkillHeatmap skills={heatmap} linkForSkill={learningLinkForSkill} />
 
             <motion.div initial={{ opacity: 0, y: 16 }} animate={{ opacity: 1, y: 0 }} className="card-elevated rounded-2xl overflow-hidden">
                 <div className="p-5 border-b border-border">
@@ -97,7 +99,16 @@ export default function SkillsPage() {
                         <tbody>
                             {gaps.map((gap, i) => (
                                 <tr key={gap.skill} className={i % 2 === 0 ? "bg-surface/20" : ""}>
-                                    <td className="p-4 font-medium">{gap.skill}</td>
+                                    <td className="p-4 font-medium">
+                                        <Link
+                                            href={learningLinkForSkill(gap.skill)}
+                                            title={`Plan how to learn ${gap.skill}`}
+                                            className="inline-flex items-center gap-1.5 text-primary hover:underline"
+                                        >
+                                            {gap.skill}
+                                            <BookOpen className="w-3.5 h-3.5 opacity-70" />
+                                        </Link>
+                                    </td>
                                     <td className="p-4"><PriorityBadge priority={gap.priority} /></td>
                                     <td className="p-4 text-muted capitalize">{(gap.category || "—").replace(/-/g, " ")}</td>
                                     <td className="p-4 text-muted">{gap.jd_count}</td>
@@ -118,7 +129,10 @@ export default function SkillsPage() {
                     <div className="space-y-2">
                         {partial.map((item) => (
                             <div key={item.skill} className="text-xs text-muted border-l-2 border-warning/40 pl-3 py-1">
-                                <span className="text-warning font-medium">{item.skill}</span> — you have {item.covered_by}
+                                <Link href={learningLinkForSkill(item.skill)} className="text-warning font-medium hover:underline">
+                                    {item.skill}
+                                </Link>
+                                {" "}— you have {item.covered_by}
                                 {item.jd_count > 1 && ` · asked for by ${item.jd_count} roles`}
                             </div>
                         ))}

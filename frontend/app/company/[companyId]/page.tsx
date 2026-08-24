@@ -10,7 +10,7 @@ import Link from "next/link";
 import { StatCard } from "@/components/ui/StatCard";
 import { EmptyState, ErrorState, PriorityBadge, ScorePill, Skeleton, StatSkeletonRow } from "@/components/ui/States";
 import { useApi } from "@/hooks/useApi";
-import { cn, getScoreColor, formatScore } from "@/lib/utils";
+import { cn, getScoreColor, formatScore, learningLinkForSkill } from "@/lib/utils";
 import { alignmentService, apiErrorMessage, companyService, jdService, resumeService } from "@/services/api";
 
 // useSearchParams must sit under a Suspense boundary for the production build.
@@ -321,7 +321,10 @@ function CompanyPageContent() {
                                 <div className="space-y-2">
                                     {missing.slice(0, 8).map((m) => (
                                         <div key={m.skill} className="flex items-center justify-between text-xs py-1.5 border-b border-border/40 last:border-0">
-                                            <span className="font-medium">{m.skill}</span>
+                                            <Link href={learningLinkForSkill(m.skill)} title={`Plan how to learn ${m.skill}`}
+                                                className="font-medium text-primary hover:underline">
+                                                {m.skill}
+                                            </Link>
                                             <PriorityBadge priority={m.priority} />
                                         </div>
                                     ))}
@@ -427,7 +430,10 @@ function CompanyPageContent() {
                                 <div className="space-y-2">
                                     {gaps.map((gap) => (
                                         <div key={gap.skill} className="flex items-center justify-between text-xs py-1.5 border-b border-border/40 last:border-0">
-                                            <span className="font-medium">{gap.skill}</span>
+                                            <Link href={learningLinkForSkill(gap.skill)} title={`Plan how to learn ${gap.skill}`}
+                                                className="font-medium text-primary hover:underline">
+                                                {gap.skill}
+                                            </Link>
                                             <div className="flex items-center gap-2">
                                                 <span className="text-muted">{gap.jd_count} role{gap.jd_count === 1 ? "" : "s"}</span>
                                                 <PriorityBadge priority={gap.priority} />

@@ -50,6 +50,18 @@ describe("SkillHeatmap", () => {
         expect(screen.getByText("Critical gap")).toBeInTheDocument();
     });
 
+    it("links each tile when linkForSkill is provided", () => {
+        render(<SkillHeatmap skills={skills} linkForSkill={(s) => `/learning?skill=${s}`} />);
+
+        const link = screen.getByText("Airflow").closest("a");
+        expect(link).toHaveAttribute("href", "/learning?skill=Airflow");
+    });
+
+    it("renders plain, non-linked tiles by default", () => {
+        render(<SkillHeatmap skills={skills} />);
+        expect(screen.getByText("Python").closest("a")).toBeNull();
+    });
+
     it("keeps the same skill listed twice when the statuses differ", () => {
         render(
             <SkillHeatmap
