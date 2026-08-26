@@ -1,12 +1,14 @@
 """Curated learning resources.
 
-Every entry is the skill's own official documentation. That is a deliberate
-constraint: the previous stub returned invented links like
-"https://coursera.org/..." for a course that does not exist, and an LLM asked
-for course recommendations hallucinates titles and URLs just as readily.
+For a concrete tool or language the entry is its own official documentation. For
+a broad concept with no single official doc (machine learning, NLP, LLMs) it is
+a free, stable, authoritative resource from a recognised source. Both are
+verifiable and non-commercial.
 
-Official docs are free, stable, authoritative, and verifiable. A skill with no
-entry here returns **no** resource rather than a plausible-looking guess.
+That is a deliberate constraint: the previous stub returned invented links like
+"https://coursera.org/..." for a course that does not exist, and an LLM asked
+for course recommendations hallucinates titles and URLs just as readily. A skill
+with no entry here returns **no** resource rather than a plausible-looking guess.
 """
 
 from typing import Dict, List, Optional
@@ -17,6 +19,7 @@ SKILL_RESOURCES: Dict[str, tuple] = {
     "TypeScript": ("TypeScript Handbook", "https://www.typescriptlang.org/docs/handbook/intro.html"),
     "JavaScript": ("MDN JavaScript Guide", "https://developer.mozilla.org/en-US/docs/Web/JavaScript/Guide"),
     "Java": ("Java Tutorials", "https://docs.oracle.com/javase/tutorial/"),
+    "C++": ("C++ Reference (cppreference)", "https://en.cppreference.com/w/cpp"),
     "Go": ("A Tour of Go", "https://go.dev/tour/"),
     "Scala": ("Scala Documentation", "https://docs.scala-lang.org/"),
     "SQL": ("PostgreSQL SQL Tutorial", "https://www.postgresql.org/docs/current/tutorial-sql.html"),
@@ -66,6 +69,14 @@ SKILL_RESOURCES: Dict[str, tuple] = {
 
     "GraphQL": ("GraphQL Learn", "https://graphql.org/learn/"),
     "REST API": ("MDN HTTP Guide", "https://developer.mozilla.org/en-US/docs/Web/HTTP"),
+
+    # Broad concepts: authoritative free resources rather than a single official doc.
+    "Machine Learning": ("Google ML Crash Course", "https://developers.google.com/machine-learning/crash-course"),
+    "Deep Learning": ("Deep Learning Book", "https://www.deeplearningbook.org/"),
+    "NLP": ("Hugging Face NLP Course", "https://huggingface.co/learn/nlp-course"),
+    "LLM": ("Hugging Face Learn", "https://huggingface.co/learn"),
+    "RAG": ("RAG — Hugging Face Transformers", "https://huggingface.co/docs/transformers/model_doc/rag"),
+    "Microservices": ("Microservices Patterns", "https://microservices.io/patterns/index.html"),
 }
 
 # Human-readable module names for the vocabulary categories.

@@ -14,6 +14,7 @@ from typing import Any, Dict, List, Optional
 from app.services.learning.resources import (
     module_name,
     prerequisite_of,
+    resource_for,
     resources_for,
 )
 from app.services.skill_gap.aggregator import AggregatedGap, GapReport, cluster_by_category
@@ -74,6 +75,8 @@ class LearningRoadmapService:
                 "total_modules": 0,
                 "resources": [],
                 "skills_covered": [],
+                # Even with no hard gaps, a partial skill is worth strengthening.
+                "partial_skills": self._partial_skills(report.partial),
                 "jds_considered": report.jds_considered,
                 "note": (
                     "No skill gaps were found across your target job descriptions. "
@@ -96,9 +99,26 @@ class LearningRoadmapService:
             "total_modules": len(modules),
             "resources": resources_for(skills),
             "skills_covered": skills,
+            # Skills you partly cover: worth reinforcing before they become gaps.
+            "partial_skills": self._partial_skills(report.partial),
             "jds_considered": report.jds_considered,
             "note": None,
         }
+
+    def _partial_skills(self, partial: List[Dict[str, Any]]) -> List[Dict[str, Any]]:
+        """Partially-covered skills, each with its docs so the user can top up."""
+        result: List[Dict[str, Any]] = []
+        for entry in partial:
+            skill = str(entry.get("skill") or "").strip()
+            if not skill:
+                continue
+            result.append({
+                "skill": skill,
+                "covered_by": entry.get("covered_by"),
+                "jd_count": entry.get("jd_count", 1),
+                "resource": resource_for(skill),
+            })
+        return result
 
     async def generate_roadmap(self, missing_skills: List[str]) -> Dict[str, Any]:
         """Build a roadmap from bare skill names, for callers without a report."""

@@ -1,6 +1,7 @@
 "use client";
 
 import { motion } from "framer-motion";
+import Link from "next/link";
 import { cn } from "@/lib/utils";
 
 export interface HeatmapSkill {
@@ -27,7 +28,14 @@ const legendItems = [
  * Built from the alignment engine's matched / partial / missing lists, so a tile
  * only appears if some job description actually asked for that skill.
  */
-export function SkillHeatmap({ skills }: { skills: HeatmapSkill[] }) {
+export function SkillHeatmap({
+    skills,
+    linkForSkill,
+}: {
+    skills: HeatmapSkill[];
+    // When provided, each tile links here (e.g. to the learning roadmap).
+    linkForSkill?: (skill: string) => string;
+}) {
     return (
         <motion.div
             initial={{ opacity: 0, y: 16 }}
@@ -56,22 +64,30 @@ export function SkillHeatmap({ skills }: { skills: HeatmapSkill[] }) {
                 </p>
             ) : (
                 <div className="flex flex-wrap gap-2">
-                    {skills.map((skill, i) => (
-                        <motion.div
-                            key={`${skill.name}-${skill.status}`}
-                            initial={{ opacity: 0, scale: 0.8 }}
-                            animate={{ opacity: 1, scale: 1 }}
-                            transition={{ delay: Math.min(i * 0.03, 0.5) }}
-                            whileHover={{ scale: 1.06, transition: { duration: 0.1 } }}
-                            className={cn(
-                                "px-3 py-1.5 rounded-lg border text-xs font-medium cursor-default transition-all",
-                                colorMap[skill.status]
-                            )}
-                            title={skill.detail || skill.name}
-                        >
-                            {skill.name}
-                        </motion.div>
-                    ))}
+                    {skills.map((skill, i) => {
+                        const tile = (
+                            <motion.div
+                                initial={{ opacity: 0, scale: 0.8 }}
+                                animate={{ opacity: 1, scale: 1 }}
+                                transition={{ delay: Math.min(i * 0.03, 0.5) }}
+                                whileHover={{ scale: 1.06, transition: { duration: 0.1 } }}
+                                className={cn(
+                                    "px-3 py-1.5 rounded-lg border text-xs font-medium transition-all",
+                                    linkForSkill ? "cursor-pointer" : "cursor-default",
+                                    colorMap[skill.status]
+                                )}
+                                title={linkForSkill ? `Plan how to learn ${skill.name}` : (skill.detail || skill.name)}
+                            >
+                                {skill.name}
+                            </motion.div>
+                        );
+                        const key = `${skill.name}-${skill.status}`;
+                        return linkForSkill ? (
+                            <Link key={key} href={linkForSkill(skill.name)}>{tile}</Link>
+                        ) : (
+                            <div key={key}>{tile}</div>
+                        );
+                    })}
                 </div>
             )}
         </motion.div>
