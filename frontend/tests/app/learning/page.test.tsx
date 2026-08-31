@@ -1,4 +1,5 @@
 import { render, screen, waitFor } from "@testing-library/react";
+import userEvent from "@testing-library/user-event";
 import { beforeEach, describe, expect, it, vi } from "vitest";
 
 import LearningPage from "@/app/learning/page";
@@ -52,6 +53,26 @@ describe("LearningPage deep-link", () => {
         expect(await screen.findByRole("heading", { name: "Learning Roadmap" })).toBeInTheDocument();
     });
 
+    it("filters modules by priority via the tabs", async () => {
+        render(<LearningPage />);
+        await screen.findByRole("heading", { name: "Learning Roadmap" });
+
+        // Critical (P1) → only the Backend Frameworks module remains. Anchor the
+        // name so the tab isn't confused with a module's "Critical" priority badge.
+        await userEvent.click(screen.getByRole("button", { name: /^Critical/ }));
+        expect(screen.getByText("Backend Frameworks")).toBeInTheDocument();
+        expect(screen.queryByText("Containerisation & Orchestration")).toBeNull();
+    });
+
+    it("the Partially covered tab shows only partial skills", async () => {
+        render(<LearningPage />);
+        await screen.findByRole("heading", { name: "Learning Roadmap" });
+
+        await userEvent.click(screen.getByRole("button", { name: /Partially covered/ }));
+        expect(screen.getByText("Kafka")).toBeInTheDocument();
+        expect(screen.queryByText("Backend Frameworks")).toBeNull();
+    });
+
     it("links a module's skill to its docs", async () => {
         render(<LearningPage />);
         await screen.findByRole("heading", { name: "Learning Roadmap" });
@@ -75,7 +96,7 @@ describe("LearningPage deep-link", () => {
         render(<LearningPage />);
 
         expect(await screen.findByText("Kafka")).toBeInTheDocument();
-        expect(screen.getByText("Partially covered")).toBeInTheDocument();
+        expect(screen.getByRole("heading", { name: /Partially covered/i })).toBeInTheDocument();
     });
 
     it("offers interview prep for a skill that has a question bank", async () => {
