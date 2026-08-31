@@ -8,6 +8,7 @@ import { cn } from "@/lib/utils";
 import { useApi } from "@/hooks/useApi";
 import { learningService } from "@/services/api";
 import { EmptyState, ErrorState, PriorityBadge, Skeleton } from "@/components/ui/States";
+import { InterviewPrep } from "@/components/learning/InterviewPrep";
 
 const priorityColor: Record<string, string> = {
     P1: "border-error text-error bg-error/10",
@@ -86,6 +87,7 @@ function LearningContent() {
 
     const modules: any[] = data?.modules || [];
     const partials: any[] = data?.partial_skills || [];
+    const questionBanks: Record<string, any> = data?.question_banks || {};
 
     const targetModuleIndex = targetSkill
         ? modules.findIndex((m: any) => (m.skills || []).some((s: string) => s.toLowerCase() === targetSkill))
@@ -224,7 +226,7 @@ function LearningContent() {
                                             <p className="text-xs text-muted mb-2">Learn more</p>
                                             <div className="space-y-1.5">
                                                 {module.resources.map((resource: any) => (
-                                                    <a
+                                    <a
                                                         key={resource.url}
                                                         href={resource.url}
                                                         target="_blank"
@@ -235,6 +237,19 @@ function LearningContent() {
                                                         {resource.title}
                                                     </a>
                                                 ))}
+                                            </div>
+                                        </div>
+                                    )}
+
+                                    {module.skills.some((s: string) => questionBanks[s]) && (
+                                        <div>
+                                            <p className="text-xs text-muted mb-2">Interview preparation</p>
+                                            <div className="space-y-2">
+                                                {module.skills
+                                                    .filter((s: string) => questionBanks[s])
+                                                    .map((s: string) => (
+                                                        <InterviewPrep key={s} skill={s} total={questionBanks[s].total} />
+                                                    ))}
                                             </div>
                                         </div>
                                     )}
@@ -290,6 +305,17 @@ function LearningContent() {
                             </div>
                         ))}
                     </div>
+
+                    {partials.some((p) => questionBanks[p.skill]) && (
+                        <div className="mt-4 pt-3 border-t border-border/50 space-y-2">
+                            <p className="text-xs text-muted">Interview preparation</p>
+                            {partials
+                                .filter((p) => questionBanks[p.skill])
+                                .map((p) => (
+                                    <InterviewPrep key={p.skill} skill={p.skill} total={questionBanks[p.skill].total} />
+                                ))}
+                        </div>
+                    )}
                 </motion.div>
             )}
         </div>
