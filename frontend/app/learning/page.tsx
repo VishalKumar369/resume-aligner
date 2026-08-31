@@ -3,7 +3,11 @@
 import { Suspense, useEffect, useRef, useState } from "react";
 import { motion } from "framer-motion";
 import { useSearchParams } from "next/navigation";
-import { CheckCircle, Circle, ExternalLink, Clock, ChevronDown, ChevronUp } from "lucide-react";
+import {
+    Check, ExternalLink, Clock, ChevronDown, Layers, Target, GraduationCap,
+    Container, Cloud, Server, Wrench, Database, Layout, Code, Radio, BarChart3, Brain,
+    Network, Building2, BookOpen,
+} from "lucide-react";
 import { cn } from "@/lib/utils";
 import { useApi } from "@/hooks/useApi";
 import { learningService } from "@/services/api";
@@ -16,10 +20,35 @@ const priorityColor: Record<string, string> = {
     P3: "border-primary text-primary bg-primary/10",
 };
 
+const nodeColor: Record<string, string> = {
+    P1: "border-error/40 text-error bg-error/10",
+    P2: "border-warning/40 text-warning bg-warning/10",
+    P3: "border-primary/40 text-primary bg-primary/10",
+};
+
+const categoryIcon: Record<string, React.ElementType> = {
+    containers: Container,
+    cloud: Cloud,
+    infrastructure: Server,
+    devops: Wrench,
+    database: Database,
+    "web-framework": Server,
+    frontend: Layout,
+    language: Code,
+    messaging: Radio,
+    data: BarChart3,
+    "ai-ml": Brain,
+    api: Network,
+    architecture: Building2,
+    tooling: Wrench,
+    discipline: Target,
+    other: BookOpen,
+};
+
 // useSearchParams must sit under a Suspense boundary for the production build.
 export default function LearningPage() {
     return (
-        <Suspense fallback={<div className="max-w-3xl mx-auto"><Skeleton className="h-8 w-56" /></div>}>
+        <Suspense fallback={<div className="max-w-4xl mx-auto"><Skeleton className="h-8 w-56" /></div>}>
             <LearningContent />
         </Suspense>
     );
@@ -75,15 +104,17 @@ function LearningContent() {
 
     if (loading) {
         return (
-            <div className="max-w-3xl mx-auto space-y-6">
-                <Skeleton className="h-8 w-56" />
-                <Skeleton className="h-24 rounded-2xl" />
-                {[0, 1, 2].map((i) => <Skeleton key={i} className="h-20 rounded-2xl" />)}
+            <div className="max-w-4xl mx-auto space-y-6">
+                <Skeleton className="h-9 w-64" />
+                <div className="grid grid-cols-2 sm:grid-cols-4 gap-3">
+                    {[0, 1, 2, 3].map((i) => <Skeleton key={i} className="h-20 rounded-2xl" />)}
+                </div>
+                {[0, 1, 2].map((i) => <Skeleton key={i} className="h-24 rounded-2xl" />)}
             </div>
         );
     }
 
-    if (error) return <div className="max-w-3xl mx-auto"><ErrorState message={error} onRetry={reload} /></div>;
+    if (error) return <div className="max-w-4xl mx-auto"><ErrorState message={error} onRetry={reload} /></div>;
 
     const modules: any[] = data?.modules || [];
     const partials: any[] = data?.partial_skills || [];
@@ -107,166 +138,197 @@ function LearningContent() {
         );
     }
 
+    const skillsCount = data?.skills_covered?.length
+        || modules.reduce((acc: number, m: any) => acc + (m.skills?.length || 0), 0);
+    const questionsCount = Object.values(questionBanks).reduce(
+        (acc: number, b: any) => acc + (b?.total || 0), 0
+    );
+    const pct = modules.length ? Math.round((completed.size / modules.length) * 100) : 0;
+
     return (
-        <div className="max-w-3xl mx-auto space-y-6">
-            <div>
-                <h1 className="text-2xl font-bold">Learning Roadmap</h1>
+        <div className="max-w-4xl mx-auto space-y-6">
+            {/* Header */}
+            <motion.div initial={{ opacity: 0, y: -8 }} animate={{ opacity: 1, y: 0 }}>
+                <div className="inline-flex items-center gap-2 text-xs text-primary bg-primary/10 border border-primary/20 rounded-full px-3 py-1 mb-3">
+                    <GraduationCap className="w-3.5 h-3.5" /> Your personalized plan
+                </div>
+                <h1 className="text-2xl sm:text-3xl font-bold">Learning Roadmap</h1>
                 <p className="text-sm text-muted mt-1">
-                    Built from gaps across {data.jds_considered} target role{data.jds_considered === 1 ? "" : "s"} ·{" "}
-                    {data.total_modules} modules · {data.total_duration}
+                    Built from the gaps across your {data.jds_considered} target role{data.jds_considered === 1 ? "" : "s"} — learn each skill, then prep for the interview.
                 </p>
+            </motion.div>
+
+            {/* Stat tiles */}
+            <div className="grid grid-cols-2 sm:grid-cols-4 gap-3">
+                <StatTile icon={Layers} label="Modules" value={modules.length} delay={0} />
+                <StatTile icon={Clock} label="Duration" value={data.total_duration} delay={0.05} />
+                <StatTile icon={Target} label="Skills" value={skillsCount} delay={0.1} />
+                <StatTile icon={GraduationCap} label="Practice Qs" value={questionsCount || "—"} delay={0.15} />
             </div>
 
+            {/* Progress */}
             {modules.length > 0 && (
-                <div className="card-elevated rounded-2xl p-5">
+                <motion.div initial={{ opacity: 0, y: 8 }} animate={{ opacity: 1, y: 0 }}
+                    className="card-elevated rounded-2xl p-5">
                     <div className="flex items-center justify-between mb-3">
-                        <span className="text-sm font-medium">Overall Progress</span>
-                        <span className="text-sm font-bold text-primary">{completed.size}/{modules.length} modules</span>
+                        <div>
+                            <span className="text-sm font-semibold">Overall progress</span>
+                            <p className="text-xs text-muted mt-0.5">Tick a module off as you finish it (saved in your browser).</p>
+                        </div>
+                        <div className="text-right">
+                            <span className="text-2xl font-bold gradient-text">{pct}%</span>
+                            <p className="text-xs text-muted">{completed.size}/{modules.length} modules</p>
+                        </div>
                     </div>
-                    <div className="h-2 bg-border rounded-full overflow-hidden">
+                    <div className="h-2.5 bg-border rounded-full overflow-hidden">
                         <motion.div
                             initial={{ width: 0 }}
-                            animate={{ width: `${(completed.size / modules.length) * 100}%` }}
-                            transition={{ duration: 0.5 }}
-                            className="h-full bg-primary rounded-full"
+                            animate={{ width: `${pct}%` }}
+                            transition={{ duration: 0.6, ease: "easeOut" }}
+                            className="h-full rounded-full bg-gradient-to-r from-primary to-accent"
                         />
                     </div>
-                    <p className="text-xs text-muted mt-2">Progress is tracked in your browser for now.</p>
-                </div>
+                </motion.div>
             )}
 
-            <div className="space-y-3">
-                {modules.map((module, i) => {
-                    const isOpen = expandedIndex === i;
-                    const isDone = completed.has(i);
-                    // Each resource carries the skill it documents, so a skill chip
-                    // can link straight to its official docs.
-                    const docsBySkill = new Map<string, any>(
-                        (module.resources || []).map((r: any) => [r.skill, r])
-                    );
+            {/* Timeline */}
+            <div className="relative">
+                {/* rail */}
+                <div className="absolute left-[19px] top-3 bottom-3 w-0.5 bg-gradient-to-b from-primary/50 via-border to-transparent" />
+                <div className="space-y-4">
+                    {modules.map((module, i) => {
+                        const isOpen = expandedIndex === i;
+                        const isDone = completed.has(i);
+                        const Icon = categoryIcon[module.category] || BookOpen;
+                        const docsBySkill = new Map<string, any>(
+                            (module.resources || []).map((r: any) => [r.skill, r])
+                        );
+                        const prepSkills = module.skills.filter((s: string) => questionBanks[s]);
 
-                    return (
-                        <motion.div
-                            key={`${module.module}-${i}`}
-                            ref={i === targetModuleIndex ? highlightRef : undefined}
-                            initial={{ opacity: 0, y: 10 }}
-                            animate={{ opacity: 1, y: 0 }}
-                            transition={{ delay: i * 0.05 }}
-                            className={cn(
-                                "card-elevated rounded-2xl overflow-hidden transition-shadow duration-500",
-                                flash && i === targetModuleIndex && "ring-2 ring-primary"
-                            )}
-                        >
-                            <button
-                                onClick={() => setExpandedIndex(isOpen ? null : i)}
-                                className="w-full p-5 flex items-center gap-4 text-left hover:bg-surface/40 transition-colors"
+                        return (
+                            <motion.div
+                                key={`${module.module}-${i}`}
+                                ref={i === targetModuleIndex ? highlightRef : undefined}
+                                initial={{ opacity: 0, y: 12 }}
+                                animate={{ opacity: 1, y: 0 }}
+                                transition={{ delay: Math.min(i * 0.06, 0.4) }}
+                                className="relative pl-14"
                             >
-                                <span
-                                    role="button"
-                                    tabIndex={0}
-                                    onClick={(e) => { e.stopPropagation(); toggleComplete(i); }}
-                                    onKeyDown={(e) => { if (e.key === "Enter") { e.stopPropagation(); toggleComplete(i); } }}
-                                    className="flex-shrink-0"
+                                {/* timeline node = completion toggle */}
+                                <button
+                                    onClick={() => toggleComplete(i)}
+                                    aria-label={isDone ? `Mark ${module.module} not done` : `Mark ${module.module} done`}
+                                    aria-pressed={isDone}
+                                    className={cn(
+                                        "absolute left-0 top-1.5 w-10 h-10 rounded-xl border-2 flex items-center justify-center transition-all z-10",
+                                        isDone
+                                            ? "border-success bg-success/15 text-success"
+                                            : cn(nodeColor[module.priority] || nodeColor.P3, "hover:scale-105")
+                                    )}
                                 >
-                                    {isDone
-                                        ? <CheckCircle className="w-5 h-5 text-success" />
-                                        : <Circle className="w-5 h-5 text-muted" />}
-                                </span>
+                                    {isDone ? <Check className="w-5 h-5" /> : <Icon className="w-5 h-5" />}
+                                </button>
 
-                                <div className="flex-1 min-w-0">
-                                    <div className="flex items-center gap-2 flex-wrap">
-                                        <span className={cn("font-medium", isDone && "line-through text-muted")}>{module.module}</span>
-                                        <PriorityBadge priority={module.priority} />
-                                    </div>
-                                    <p className="text-xs text-muted mt-1 inline-flex items-center gap-2">
-                                        <Clock className="w-3 h-3" /> {module.week}
-                                        <span>· wanted by {module.jd_demand} role{module.jd_demand === 1 ? "" : "s"}</span>
-                                    </p>
-                                </div>
-
-                                {isOpen ? <ChevronUp className="w-4 h-4 text-muted" /> : <ChevronDown className="w-4 h-4 text-muted" />}
-                            </button>
-
-                            {isOpen && (
-                                <div className="px-5 pb-5 space-y-3 border-t border-border/50 pt-4">
-                                    <div>
-                                        <p className="text-xs text-muted mb-2">
-                                            Skills in this module
-                                            {docsBySkill.size > 0 && <span className="text-muted"> · tap one to open its docs</span>}
-                                        </p>
-                                        <div className="flex flex-wrap gap-2">
-                                            {module.skills.map((skill: string) => {
-                                                const doc = docsBySkill.get(skill);
-                                                const chip = cn(
-                                                    "px-2.5 py-1 rounded-lg border text-xs inline-flex items-center gap-1",
-                                                    priorityColor[module.priority] || priorityColor.P3,
-                                                    isTarget(skill) && "ring-2 ring-primary font-semibold"
-                                                );
-                                                return doc ? (
-                                                    <a
-                                                        key={skill}
-                                                        href={doc.url}
-                                                        target="_blank"
-                                                        rel="noopener noreferrer"
-                                                        title={`Open ${doc.title}`}
-                                                        className={cn(chip, "hover:opacity-80 transition-opacity")}
-                                                    >
-                                                        {skill}
-                                                        <ExternalLink className="w-3 h-3 opacity-70" />
-                                                    </a>
-                                                ) : (
-                                                    <span key={skill} className={chip}>{skill}</span>
-                                                );
-                                            })}
-                                        </div>
-                                    </div>
-
-                                    {module.resources?.length > 0 && (
-                                        <div>
-                                            <p className="text-xs text-muted mb-2">Learn more</p>
-                                            <div className="space-y-1.5">
-                                                {module.resources.map((resource: any) => (
-                                    <a
-                                                        key={resource.url}
-                                                        href={resource.url}
-                                                        target="_blank"
-                                                        rel="noopener noreferrer"
-                                                        className="flex items-center gap-2 text-xs text-primary hover:underline"
-                                                    >
-                                                        <ExternalLink className="w-3 h-3 flex-shrink-0" />
-                                                        {resource.title}
-                                                    </a>
-                                                ))}
+                                <div className={cn(
+                                    "card-elevated rounded-2xl overflow-hidden transition-shadow duration-500",
+                                    flash && i === targetModuleIndex && "ring-2 ring-primary"
+                                )}>
+                                    <button
+                                        onClick={() => setExpandedIndex(isOpen ? null : i)}
+                                        aria-expanded={isOpen}
+                                        className="w-full p-4 sm:p-5 flex items-center gap-3 text-left hover:bg-surface/40 transition-colors"
+                                    >
+                                        <div className="flex-1 min-w-0">
+                                            <div className="flex items-center gap-2 flex-wrap">
+                                                <span className={cn("font-semibold", isDone && "line-through text-muted")}>
+                                                    {module.module}
+                                                </span>
+                                                <PriorityBadge priority={module.priority} />
+                                            </div>
+                                            <div className="flex items-center gap-2 flex-wrap mt-1.5 text-xs text-muted">
+                                                <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded-md bg-surface-2 border border-border/60">
+                                                    <Clock className="w-3 h-3" /> {module.week}
+                                                </span>
+                                                <span>{module.skills.length} skill{module.skills.length === 1 ? "" : "s"}</span>
+                                                <span>· wanted by {module.jd_demand} role{module.jd_demand === 1 ? "" : "s"}</span>
+                                                {prepSkills.length > 0 && (
+                                                    <span className="inline-flex items-center gap-1 text-primary">
+                                                        <GraduationCap className="w-3 h-3" /> prep
+                                                    </span>
+                                                )}
                                             </div>
                                         </div>
-                                    )}
+                                        <ChevronDown className={cn("w-4 h-4 text-muted flex-shrink-0 transition-transform", isOpen && "rotate-180")} />
+                                    </button>
 
-                                    {module.skills.some((s: string) => questionBanks[s]) && (
-                                        <div>
-                                            <p className="text-xs text-muted mb-2">Interview preparation</p>
-                                            <div className="space-y-2">
-                                                {module.skills
-                                                    .filter((s: string) => questionBanks[s])
-                                                    .map((s: string) => (
-                                                        <InterviewPrep key={s} skill={s} total={questionBanks[s].total} />
-                                                    ))}
+                                    {isOpen && (
+                                        <div className="px-4 sm:px-5 pb-5 space-y-4 border-t border-border/50 pt-4">
+                                            <div>
+                                                <p className="text-[11px] uppercase tracking-wider text-muted font-semibold mb-2">
+                                                    Skills to learn
+                                                    {docsBySkill.size > 0 && <span className="normal-case font-normal tracking-normal"> · tap to open docs</span>}
+                                                </p>
+                                                <div className="flex flex-wrap gap-2">
+                                                    {module.skills.map((skill: string) => {
+                                                        const doc = docsBySkill.get(skill);
+                                                        const chip = cn(
+                                                            "px-2.5 py-1 rounded-lg border text-xs inline-flex items-center gap-1",
+                                                            priorityColor[module.priority] || priorityColor.P3,
+                                                            isTarget(skill) && "ring-2 ring-primary font-semibold"
+                                                        );
+                                                        return doc ? (
+                                                            <a key={skill} href={doc.url} target="_blank" rel="noopener noreferrer"
+                                                                title={`Open ${doc.title}`} className={cn(chip, "hover:opacity-80 transition-opacity")}>
+                                                                {skill}<ExternalLink className="w-3 h-3 opacity-70" />
+                                                            </a>
+                                                        ) : (
+                                                            <span key={skill} className={chip}>{skill}</span>
+                                                        );
+                                                    })}
+                                                </div>
                                             </div>
+
+                                            {module.resources?.length > 0 && (
+                                                <div>
+                                                    <p className="text-[11px] uppercase tracking-wider text-muted font-semibold mb-2">Documentation</p>
+                                                    <div className="grid sm:grid-cols-2 gap-1.5">
+                                                        {module.resources.map((resource: any) => (
+                                                            <a key={resource.url} href={resource.url} target="_blank" rel="noopener noreferrer"
+                                                                className="flex items-center gap-2 text-xs text-primary hover:underline">
+                                                                <BookOpen className="w-3 h-3 flex-shrink-0" />
+                                                                {resource.title}
+                                                            </a>
+                                                        ))}
+                                                    </div>
+                                                </div>
+                                            )}
+
+                                            {prepSkills.length > 0 && (
+                                                <div>
+                                                    <p className="text-[11px] uppercase tracking-wider text-muted font-semibold mb-2">Interview preparation</p>
+                                                    <div className="space-y-2">
+                                                        {prepSkills.map((s: string) => (
+                                                            <InterviewPrep key={s} skill={s} total={questionBanks[s].total} />
+                                                        ))}
+                                                    </div>
+                                                </div>
+                                            )}
                                         </div>
                                     )}
                                 </div>
-                            )}
-                        </motion.div>
-                    );
-                })}
+                            </motion.div>
+                        );
+                    })}
+                </div>
             </div>
 
+            {/* Partials */}
             {partials.length > 0 && (
-                <motion.div
-                    initial={{ opacity: 0, y: 10 }}
-                    animate={{ opacity: 1, y: 0 }}
-                    className="card-elevated rounded-2xl p-5"
-                >
-                    <h3 className="text-sm font-semibold text-warning">Partially covered</h3>
+                <motion.div initial={{ opacity: 0, y: 10 }} animate={{ opacity: 1, y: 0 }}
+                    className="card-elevated rounded-2xl p-5">
+                    <h3 className="text-sm font-semibold text-warning inline-flex items-center gap-2">
+                        <Wrench className="w-4 h-4" /> Partially covered
+                    </h3>
                     <p className="text-xs text-muted mt-0.5 mb-3">
                         Skills you partly cover — worth reinforcing before they become gaps.
                     </p>
@@ -282,22 +344,14 @@ function LearningContent() {
                             >
                                 <div className="min-w-0">
                                     <span className={cn("text-sm font-medium", isTarget(p.skill) && "text-primary")}>{p.skill}</span>
-                                    {p.covered_by && (
-                                        <span className="text-xs text-muted"> · you have {p.covered_by}</span>
-                                    )}
+                                    {p.covered_by && <span className="text-xs text-muted"> · you have {p.covered_by}</span>}
                                 </div>
                                 <div className="flex items-center gap-3 flex-shrink-0">
-                                    <span className="text-xs text-muted">
-                                        {p.jd_count} role{p.jd_count === 1 ? "" : "s"}
-                                    </span>
+                                    <span className="text-xs text-muted">{p.jd_count} role{p.jd_count === 1 ? "" : "s"}</span>
                                     {p.resource && (
-                                        <a
-                                            href={p.resource.url}
-                                            target="_blank"
-                                            rel="noopener noreferrer"
+                                        <a href={p.resource.url} target="_blank" rel="noopener noreferrer"
                                             title={`Open ${p.resource.title}`}
-                                            className="text-xs text-primary hover:underline inline-flex items-center gap-1"
-                                        >
+                                            className="text-xs text-primary hover:underline inline-flex items-center gap-1">
                                             Docs <ExternalLink className="w-3 h-3" />
                                         </a>
                                     )}
@@ -308,16 +362,31 @@ function LearningContent() {
 
                     {partials.some((p) => questionBanks[p.skill]) && (
                         <div className="mt-4 pt-3 border-t border-border/50 space-y-2">
-                            <p className="text-xs text-muted">Interview preparation</p>
-                            {partials
-                                .filter((p) => questionBanks[p.skill])
-                                .map((p) => (
-                                    <InterviewPrep key={p.skill} skill={p.skill} total={questionBanks[p.skill].total} />
-                                ))}
+                            <p className="text-[11px] uppercase tracking-wider text-muted font-semibold">Interview preparation</p>
+                            {partials.filter((p) => questionBanks[p.skill]).map((p) => (
+                                <InterviewPrep key={p.skill} skill={p.skill} total={questionBanks[p.skill].total} />
+                            ))}
                         </div>
                     )}
                 </motion.div>
             )}
         </div>
+    );
+}
+
+function StatTile({ icon: Icon, label, value, delay }: { icon: React.ElementType; label: string; value: React.ReactNode; delay: number }) {
+    return (
+        <motion.div
+            initial={{ opacity: 0, y: 10 }}
+            animate={{ opacity: 1, y: 0 }}
+            transition={{ delay }}
+            className="card-elevated rounded-2xl p-4"
+        >
+            <div className="w-8 h-8 rounded-lg bg-primary/10 border border-primary/20 flex items-center justify-center mb-2">
+                <Icon className="w-4 h-4 text-primary" />
+            </div>
+            <div className="text-xl font-bold leading-none">{value}</div>
+            <div className="text-xs text-muted mt-1">{label}</div>
+        </motion.div>
     );
 }
