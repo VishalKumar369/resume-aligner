@@ -101,8 +101,25 @@ class LearningRoadmapSchema(BaseModel):
     skills_covered: List[str] = []
     # Skills you partly cover (with what covers them and their docs).
     partial_skills: List[Dict[str, Any]] = []
+    # {skill: {beginner, intermediate, advanced, practical, total}} for the skills
+    # in this plan that have an interview question bank.
+    question_banks: Dict[str, Dict[str, int]] = {}
     jds_considered: int = 0
     note: Optional[str] = None
+
+
+class QuestionLevelSchema(BaseModel):
+    level: str
+    label: str
+    count: int
+    questions: List[str] = []
+
+
+class SkillQuestionsSchema(BaseModel):
+    """An interview question bank for one skill, grouped by difficulty."""
+    skill: str
+    total: int
+    levels: List[QuestionLevelSchema] = []
 
 class InterviewProbabilitySchema(BaseModel):
     """A heuristic band, with its basis stated rather than implied."""

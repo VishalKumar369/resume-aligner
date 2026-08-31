@@ -341,6 +341,52 @@ class TestLearningRoadmap:
         assert roadmap["modules"] == []
         assert [p["skill"] for p in roadmap["partial_skills"]] == ["Kafka"]
 
+    @pytest.mark.asyncio
+    async def test_reports_which_plan_skills_have_a_question_bank(self):
+        report = SkillGapAggregator().aggregate([analysis([gap("LLM"), gap("Kafka")])])
+        roadmap = await LearningRoadmapService().generate(report)
+
+        # LLM has a curated bank; Kafka (for now) does not.
+        assert "LLM" in roadmap["question_banks"]
+        assert roadmap["question_banks"]["LLM"]["total"] == 60
+        assert "Kafka" not in roadmap["question_banks"]
+
+
+class TestQuestionBank:
+    def test_each_bank_has_the_full_60_question_layout(self):
+        from app.services.learning.question_bank import _BANKS, question_counts
+
+        for skill in _BANKS:
+            counts = question_counts(skill)
+            assert counts == {
+                "beginner": 20, "intermediate": 15, "advanced": 15, "practical": 10, "total": 60
+            }, skill
+
+    def test_questions_are_non_empty_and_unique_within_a_skill(self):
+        from app.services.learning.question_bank import _BANKS, questions_for
+
+        for skill in _BANKS:
+            bank = questions_for(skill)
+            seen = set()
+            for level in bank["levels"]:
+                for q in level["questions"]:
+                    assert q.strip(), f"empty question in {skill}"
+                    assert q not in seen, f"duplicate in {skill}: {q}"
+                    seen.add(q)
+
+    def test_unknown_skill_has_no_bank(self):
+        from app.services.learning.question_bank import has_questions, questions_for
+
+        assert has_questions("Fictional Skill") is False
+        assert questions_for("Fictional Skill") is None
+
+    def test_summary_counts_only_covered_skills(self):
+        from app.services.learning.question_bank import bank_summary
+
+        summary = bank_summary(["LLM", "NLP", "Kafka", "LLM"])
+        assert set(summary) == {"LLM", "NLP"}
+        assert summary["LLM"]["beginner"] == 20
+
 
 class TestDashboardMetrics:
     def _run(self, jd_id, alignment, ats, missing=None):
