@@ -143,6 +143,8 @@ export const dashboardService = {
 
 export const learningService = {
     getRoadmap: () => api.get("/learning/roadmap"),
+    /** Interview question bank for a skill (grouped by difficulty). */
+    getQuestions: (skill: string) => api.get("/learning/questions", { params: { skill } }),
 };
 
 export const companyService = {

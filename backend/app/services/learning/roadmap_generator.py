@@ -11,6 +11,7 @@ saved. Nothing is suggested speculatively.
 from dataclasses import dataclass, field
 from typing import Any, Dict, List, Optional
 
+from app.services.learning.question_bank import bank_summary
 from app.services.learning.resources import (
     module_name,
     prerequisite_of,
@@ -77,6 +78,9 @@ class LearningRoadmapService:
                 "skills_covered": [],
                 # Even with no hard gaps, a partial skill is worth strengthening.
                 "partial_skills": self._partial_skills(report.partial),
+                "question_banks": bank_summary(
+                    [str(p.get("skill") or "") for p in report.partial]
+                ),
                 "jds_considered": report.jds_considered,
                 "note": (
                     "No skill gaps were found across your target job descriptions. "
@@ -101,6 +105,10 @@ class LearningRoadmapService:
             "skills_covered": skills,
             # Skills you partly cover: worth reinforcing before they become gaps.
             "partial_skills": self._partial_skills(report.partial),
+            # Which plan skills (gaps + partials) have an interview question bank.
+            "question_banks": bank_summary(
+                skills + [str(p.get("skill") or "") for p in report.partial]
+            ),
             "jds_considered": report.jds_considered,
             "note": None,
         }

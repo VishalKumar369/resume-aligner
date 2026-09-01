@@ -293,6 +293,14 @@ describe("jd, alignment, dashboard and learning services", () => {
         expect(axiosInstance.get).toHaveBeenNthCalledWith(2, "/learning/roadmap");
     });
 
+    it("fetches a skill's interview questions by query param", () => {
+        learningService.getQuestions("CI/CD");
+
+        expect(axiosInstance.get).toHaveBeenCalledWith("/learning/questions", {
+            params: { skill: "CI/CD" },
+        });
+    });
+
     it("url-encodes the company id in the insights path", () => {
         companyService.getInsights("mathco & co");
 
