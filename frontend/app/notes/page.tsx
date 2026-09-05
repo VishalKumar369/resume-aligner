@@ -1,6 +1,7 @@
 "use client";
 
 import { Suspense, useEffect, useMemo, useState } from "react";
+import { createPortal } from "react-dom";
 import { motion, AnimatePresence } from "framer-motion";
 import { useSearchParams } from "next/navigation";
 import {
@@ -25,7 +26,10 @@ interface Note {
 }
 
 const COLORS = ["primary", "accent", "success", "warning", "error"] as const;
-const CATEGORY_SUGGESTIONS = ["Goal", "Journal", "Idea", "Task", "Reminder"];
+const CATEGORY_SUGGESTIONS = [
+    "Goal", "Journal", "Idea", "Task", "Reminder",
+    "High priority", "Medium priority", "Low priority",
+];
 
 const accentBar: Record<string, string> = {
     primary: "border-l-primary", accent: "border-l-accent", success: "border-l-success",
@@ -54,6 +58,9 @@ function NotesContent() {
     const [form, setForm] = useState(emptyForm);
     const [saving, setSaving] = useState(false);
     const [actionError, setActionError] = useState<string | null>(null);
+    // The composer is portalled to <body>, so guard the portal until mounted.
+    const [mounted, setMounted] = useState(false);
+    useEffect(() => setMounted(true), []);
 
     // Open the composer pre-filled when linked from a skill gap ("Add as goal").
     useEffect(() => {
@@ -276,10 +283,12 @@ function NotesContent() {
                 </>
             )}
 
-            {/* Composer modal */}
-            <AnimatePresence>
+            {/* Composer modal — portalled to <body> so its overlay covers the
+                whole viewport, above the sticky navbar and sidebar. */}
+            {mounted && createPortal(
+                <AnimatePresence>
                 {editing !== null && (
-                    <div className="fixed inset-0 z-[80] flex items-center justify-center p-4">
+                    <div className="fixed inset-0 z-[100] flex items-center justify-center p-4">
                         <motion.div initial={{ opacity: 0 }} animate={{ opacity: 1 }} exit={{ opacity: 0 }}
                             onClick={close} className="absolute inset-0 bg-black/60 backdrop-blur-sm" />
                         <motion.div
@@ -348,7 +357,9 @@ function NotesContent() {
                         </motion.div>
                     </div>
                 )}
-            </AnimatePresence>
+                </AnimatePresence>,
+                document.body
+            )}
         </div>
     );
 }

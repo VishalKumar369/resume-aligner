@@ -11,6 +11,9 @@
    * :root is the dark theme (the product default); .light overrides it.
    */
   :root {
+    /* Tells the browser to render native controls (date picker, scrollbars)
+       for a dark UI, so the date input's calendar icon is light and visible. */
+    color-scheme: dark;
     --background: 10 10 15;
     --foreground: 250 250 250;
     --card: 17 17 24;
@@ -36,6 +39,8 @@
   }
 
   .light {
+    /* Light native controls, so the calendar icon reads dark on the light UI. */
+    color-scheme: light;
     --background: 243 244 251;
     --foreground: 17 18 28;
     --card: 255 255 255;
