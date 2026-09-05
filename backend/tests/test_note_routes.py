@@ -179,3 +179,18 @@ class TestSchema:
     def test_update_ignores_unset_fields(self):
         changes = NoteUpdate(is_pinned=True).model_dump(exclude_unset=True)
         assert changes == {"is_pinned": True}
+
+    def test_aware_target_date_is_stored_as_naive_utc(self):
+        from datetime import datetime, timedelta, timezone
+
+        # A UTC 'Z' timestamp from the client is dropped to naive UTC (the column
+        # is TIMESTAMP WITHOUT TIME ZONE).
+        utc = NoteCreate(title="x", target_date=datetime(2026, 9, 15, 18, 30, tzinfo=timezone.utc))
+        assert utc.target_date == datetime(2026, 9, 15, 18, 30)
+        assert utc.target_date.tzinfo is None
+
+        # An offset-aware value is converted to UTC first (18:30 IST -> 13:00 UTC).
+        ist = timezone(timedelta(hours=5, minutes=30))
+        conv = NoteUpdate(target_date=datetime(2026, 9, 15, 18, 30, tzinfo=ist))
+        assert conv.target_date == datetime(2026, 9, 15, 13, 0)
+        assert conv.target_date.tzinfo is None

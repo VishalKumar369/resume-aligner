@@ -1,4 +1,4 @@
-from datetime import datetime
+from datetime import datetime, timezone
 from typing import Optional
 from uuid import UUID
 
@@ -6,6 +6,19 @@ from pydantic import BaseModel, ConfigDict, field_validator
 
 # Colour accents the UI knows how to render.
 _ALLOWED_COLORS = {"primary", "accent", "success", "warning", "error"}
+
+
+def _to_naive_utc(value: Optional[datetime]) -> Optional[datetime]:
+    """Store datetimes as naive UTC to match the rest of the app's columns.
+
+    The client sends an offset-aware timestamp (…Z); the notes.target_date column
+    is TIMESTAMP WITHOUT TIME ZONE, so an aware value would fail to bind.
+    """
+    if value is None:
+        return None
+    if value.tzinfo is not None:
+        return value.astimezone(timezone.utc).replace(tzinfo=None)
+    return value
 
 
 class NoteBase(BaseModel):
@@ -29,6 +42,11 @@ class NoteBase(BaseModel):
         if not cleaned:
             raise ValueError("Title is required.")
         return cleaned
+
+    @field_validator("target_date")
+    @classmethod
+    def _naive_target(cls, value: Optional[datetime]) -> Optional[datetime]:
+        return _to_naive_utc(value)
 
 
 class NoteCreate(NoteBase):
@@ -61,6 +79,11 @@ class NoteUpdate(BaseModel):
         if not cleaned:
             raise ValueError("Title cannot be blank.")
         return cleaned
+
+    @field_validator("target_date")
+    @classmethod
+    def _naive_target(cls, value: Optional[datetime]) -> Optional[datetime]:
+        return _to_naive_utc(value)
 
 
 class NoteOut(NoteBase):
