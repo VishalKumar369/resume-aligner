@@ -7,7 +7,8 @@ from app.api.v1 import (
     dashboard_routes,
     jd_routes,
     learning_routes,
-    company_routes
+    company_routes,
+    note_routes,
 )
 
 api_router = APIRouter()
@@ -20,3 +21,4 @@ api_router.include_router(dashboard_routes.router, prefix="/dashboard", tags=["D
 api_router.include_router(jd_routes.router, prefix="/jd", tags=["Job Descriptions"])
 api_router.include_router(learning_routes.router, prefix="/learning", tags=["Learning"])
 api_router.include_router(company_routes.router, prefix="/company", tags=["Company"])
+api_router.include_router(note_routes.router, prefix="/notes", tags=["Notes"])

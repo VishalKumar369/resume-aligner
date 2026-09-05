@@ -7,3 +7,4 @@ from app.models.alignment import AlignmentScore # noqa
 from app.models.version import ResumeVersion # noqa
 from app.models.analytics import SkillGap, LearningPath, DashboardSnapshot # noqa
 from app.models.llm_cache import LLMCacheEntry # noqa
+from app.models.note import Note # noqa
