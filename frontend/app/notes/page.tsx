@@ -4,6 +4,7 @@ import { useMemo, useState } from "react";
 import { motion, AnimatePresence } from "framer-motion";
 import {
     Plus, Pin, PinOff, Pencil, Trash2, Check, CalendarDays, X, Target, NotebookPen,
+    Search, ListChecks, CircleCheck, Clock, AlertTriangle,
 } from "lucide-react";
 import { cn } from "@/lib/utils";
 import { useApi } from "@/hooks/useApi";
@@ -43,6 +44,8 @@ export default function NotesPage() {
     const [saving, setSaving] = useState(false);
     const [actionError, setActionError] = useState<string | null>(null);
     const [filter, setFilter] = useState<string>("all");
+    const [search, setSearch] = useState("");
+    const [hideCompleted, setHideCompleted] = useState(false);
 
     const list = notes || [];
 
@@ -50,7 +53,21 @@ export default function NotesPage() {
         () => Array.from(new Set(list.map((n) => n.category).filter(Boolean))),
         [list]
     );
-    const visible = filter === "all" ? list : list.filter((n) => n.category === filter);
+
+    const now = Date.now();
+    const summary = useMemo(() => ({
+        total: list.length,
+        completed: list.filter((n) => n.is_completed).length,
+        upcoming: list.filter((n) => n.target_date && !n.is_completed && new Date(n.target_date).getTime() >= now).length,
+        overdue: list.filter((n) => n.target_date && !n.is_completed && new Date(n.target_date).getTime() < now).length,
+    }), [list, now]);
+
+    const q = search.trim().toLowerCase();
+    const visible = list.filter((n) =>
+        (filter === "all" || n.category === filter) &&
+        (!hideCompleted || !n.is_completed) &&
+        (!q || n.title.toLowerCase().includes(q) || (n.content || "").toLowerCase().includes(q))
+    );
 
     const openNew = () => { setForm(emptyForm); setEditing({}); setActionError(null); };
     const openEdit = (note: Note) => {
@@ -157,7 +174,44 @@ export default function NotesPage() {
                 </div>
             ) : (
                 <>
-                    {/* Category filter */}
+                    {/* Target summary */}
+                    <div className="grid grid-cols-2 sm:grid-cols-4 gap-3">
+                        <SummaryTile icon={ListChecks} label="Total" value={summary.total} tone="primary" />
+                        <SummaryTile icon={CircleCheck} label="Completed" value={summary.completed} tone="success" />
+                        <SummaryTile icon={Clock} label="Upcoming" value={summary.upcoming} tone="primary" />
+                        <SummaryTile icon={AlertTriangle} label="Overdue" value={summary.overdue} tone="error" />
+                    </div>
+
+                    {/* Controls: search + hide completed + category filter */}
+                    <div className="flex flex-col sm:flex-row sm:items-center gap-3">
+                        <div className="flex items-center gap-2 input-field flex-1 py-2">
+                            <Search className="w-4 h-4 text-muted flex-shrink-0" />
+                            <input
+                                className="flex-1 bg-transparent outline-none text-sm"
+                                placeholder="Search notes…"
+                                value={search}
+                                onChange={(e) => setSearch(e.target.value)}
+                            />
+                            {search && (
+                                <button onClick={() => setSearch("")} aria-label="Clear search" className="text-muted hover:text-foreground">
+                                    <X className="w-4 h-4" />
+                                </button>
+                            )}
+                        </div>
+                        <button
+                            onClick={() => setHideCompleted((v) => !v)}
+                            aria-pressed={hideCompleted}
+                            className={cn(
+                                "px-3 py-2 rounded-xl text-sm font-medium border transition-colors inline-flex items-center gap-2 flex-shrink-0",
+                                hideCompleted
+                                    ? "bg-primary/10 text-primary border-primary/30"
+                                    : "border-border text-muted hover:text-foreground hover:bg-surface-2"
+                            )}
+                        >
+                            <Check className="w-4 h-4" /> Hide completed
+                        </button>
+                    </div>
+
                     {categories.length > 1 && (
                         <div className="flex flex-wrap gap-2">
                             {["all", ...categories].map((c) => (
@@ -179,16 +233,20 @@ export default function NotesPage() {
                     )}
 
                     {/* Grid */}
-                    <div className="grid sm:grid-cols-2 lg:grid-cols-3 gap-4">
-                        {visible.map((note, i) => (
-                            <NoteCard key={note.id} note={note} delay={i}
-                                onEdit={() => openEdit(note)}
-                                onDelete={() => remove(note)}
-                                onTogglePin={() => patch(note, { is_pinned: !note.is_pinned })}
-                                onToggleComplete={() => patch(note, { is_completed: !note.is_completed })}
-                            />
-                        ))}
-                    </div>
+                    {visible.length > 0 ? (
+                        <div className="grid sm:grid-cols-2 lg:grid-cols-3 gap-4">
+                            {visible.map((note, i) => (
+                                <NoteCard key={note.id} note={note} delay={i}
+                                    onEdit={() => openEdit(note)}
+                                    onDelete={() => remove(note)}
+                                    onTogglePin={() => patch(note, { is_pinned: !note.is_pinned })}
+                                    onToggleComplete={() => patch(note, { is_completed: !note.is_completed })}
+                                />
+                            ))}
+                        </div>
+                    ) : (
+                        <p className="text-sm text-muted text-center py-10">No notes match your filters.</p>
+                    )}
                 </>
             )}
 
@@ -265,6 +323,24 @@ export default function NotesPage() {
                     </div>
                 )}
             </AnimatePresence>
+        </div>
+    );
+}
+
+function SummaryTile({ icon: Icon, label, value, tone }: {
+    icon: React.ElementType; label: string; value: number; tone: "primary" | "success" | "error";
+}) {
+    const toneClass = tone === "success" ? "text-success bg-success/10"
+        : tone === "error" ? "text-error bg-error/10" : "text-primary bg-primary/10";
+    return (
+        <div className="card-elevated rounded-2xl p-4 flex items-center gap-3">
+            <div className={cn("w-9 h-9 rounded-lg flex items-center justify-center flex-shrink-0", toneClass)}>
+                <Icon className="w-4 h-4" />
+            </div>
+            <div>
+                <div className="text-xl font-bold leading-none">{value}</div>
+                <div className="text-xs text-muted mt-1">{label}</div>
+            </div>
         </div>
     );
 }

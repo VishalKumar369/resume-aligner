@@ -104,3 +104,45 @@ describe("NotesPage", () => {
         expect(screen.getByRole("heading", { name: "New note" })).toBeInTheDocument();
     });
 });
+
+describe("NotesPage — search, filters & summary", () => {
+    const rich = [
+        { id: "n1", title: "Learn Kafka", content: "streaming", category: "Goal", color: "primary", target_date: null, is_pinned: false, is_completed: false, created_at: "2026-09-01T00:00:00Z" },
+        { id: "n2", title: "Weekly journal", content: "reflections", category: "Journal", color: "success", target_date: "2026-12-01T00:00:00Z", is_pinned: false, is_completed: false, created_at: "2026-09-02T00:00:00Z" },
+        { id: "n3", title: "Old target", content: "overdue one", category: "Goal", color: "warning", target_date: "2025-01-01T00:00:00Z", is_pinned: false, is_completed: false, created_at: "2026-08-01T00:00:00Z" },
+        { id: "n4", title: "Finished task", content: "shipped", category: "Task", color: "success", target_date: null, is_pinned: false, is_completed: true, created_at: "2026-08-15T00:00:00Z" },
+    ];
+
+    beforeEach(() => {
+        vi.mocked(noteService.getAll).mockResolvedValue({ data: rich } as any);
+    });
+
+    it("summarizes total, completed, upcoming and overdue targets", async () => {
+        render(<NotesPage />);
+        await screen.findByText("Learn Kafka");
+
+        expect(screen.getByText("Total")).toBeInTheDocument();
+        expect(screen.getByText("Completed")).toBeInTheDocument();
+        expect(screen.getByText("Upcoming")).toBeInTheDocument();
+        expect(screen.getByText("Overdue")).toBeInTheDocument();
+        expect(screen.getByText("4")).toBeInTheDocument(); // total
+    });
+
+    it("filters notes by the search box", async () => {
+        render(<NotesPage />);
+        await screen.findByText("Learn Kafka");
+
+        await userEvent.type(screen.getByPlaceholderText(/Search notes/i), "journal");
+        expect(screen.getByText("Weekly journal")).toBeInTheDocument();
+        expect(screen.queryByText("Learn Kafka")).toBeNull();
+    });
+
+    it("hides completed notes when toggled", async () => {
+        render(<NotesPage />);
+        await screen.findByText("Finished task");
+
+        await userEvent.click(screen.getByRole("button", { name: /Hide completed/i }));
+        expect(screen.queryByText("Finished task")).toBeNull();
+        expect(screen.getByText("Learn Kafka")).toBeInTheDocument();
+    });
+});
