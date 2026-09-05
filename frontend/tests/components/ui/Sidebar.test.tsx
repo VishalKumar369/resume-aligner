@@ -58,6 +58,20 @@ describe("Sidebar", () => {
         expect(navRow("Company Intel")).toHaveClass("text-primary");
     });
 
+    it("groups Notes under a Personal heading", () => {
+        render(<Sidebar />);
+
+        expect(screen.getByText("Personal")).toBeInTheDocument();
+        expect(screen.getByText("Notes").closest("a")).toHaveAttribute("href", "/notes");
+    });
+
+    it("highlights Notes on the notes route", () => {
+        setPathname("/notes");
+        render(<Sidebar />);
+
+        expect(navRow("Notes")).toHaveClass("text-primary");
+    });
+
     it("keeps Company Intel active on any company route, not just the demo one", () => {
         // Arriving from an analysis's Insights link lands on a different slug.
         setPathname("/company/at-t-inc");

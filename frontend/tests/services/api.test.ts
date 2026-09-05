@@ -15,6 +15,7 @@ import {
     dashboardService,
     jdService,
     learningService,
+    noteService,
     resumeService,
     userService,
 } from "@/services/api";
@@ -283,6 +284,18 @@ describe("jd, alignment, dashboard and learning services", () => {
         expect(axiosInstance.get).toHaveBeenCalledWith("/alignment/list", {
             params: { limit: 100 },
         });
+    });
+
+    it("manages personal notes", () => {
+        noteService.getAll();
+        noteService.create({ title: "Plan" });
+        noteService.update("n-1", { is_pinned: true });
+        noteService.remove("n-1");
+
+        expect(axiosInstance.get).toHaveBeenCalledWith("/notes");
+        expect(axiosInstance.post).toHaveBeenCalledWith("/notes", { title: "Plan" });
+        expect(axiosInstance.patch).toHaveBeenCalledWith("/notes/n-1", { is_pinned: true });
+        expect(axiosInstance.delete).toHaveBeenCalledWith("/notes/n-1");
     });
 
     it("hits the dashboard and learning endpoints", () => {
