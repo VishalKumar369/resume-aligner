@@ -35,3 +35,20 @@ export const PLATFORM_NAME =
 export function learningLinkForSkill(skill: string): string {
     return `/learning?skill=${encodeURIComponent(skill)}`;
 }
+
+/** Deep-link to the notes planner with the composer pre-filled (e.g. from a gap). */
+export function noteComposeLink(params: {
+    title?: string;
+    content?: string;
+    category?: string;
+    color?: string;
+    target?: string;
+}): string {
+    const q = new URLSearchParams({ compose: "1" });
+    if (params.title) q.set("title", params.title);
+    if (params.content) q.set("content", params.content);
+    if (params.category) q.set("category", params.category);
+    if (params.color) q.set("color", params.color);
+    if (params.target) q.set("target", params.target);
+    return `/notes?${q.toString()}`;
+}

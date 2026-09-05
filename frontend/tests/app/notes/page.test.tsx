@@ -5,10 +5,23 @@ import { beforeEach, describe, expect, it, vi } from "vitest";
 import NotesPage from "@/app/notes/page";
 import { noteService } from "@/services/api";
 
+// Controllable search params for the compose-from-URL flow.
+let mockSearch = new URLSearchParams();
+
+vi.mock("next/navigation", () => ({
+    useSearchParams: () => mockSearch,
+    useRouter: () => ({ push: vi.fn(), replace: vi.fn(), prefetch: vi.fn() }),
+    usePathname: () => "/notes",
+}));
+
 vi.mock("@/services/api", () => ({
     noteService: { getAll: vi.fn(), create: vi.fn(), update: vi.fn(), remove: vi.fn() },
     apiErrorMessage: (e: any) => e?.message ?? "error",
 }));
+
+beforeEach(() => {
+    mockSearch = new URLSearchParams();
+});
 
 const notes = [
     {
@@ -102,6 +115,15 @@ describe("NotesPage", () => {
         expect(await screen.findByText("No notes yet")).toBeInTheDocument();
         await userEvent.click(screen.getByRole("button", { name: /Create a note/i }));
         expect(screen.getByRole("heading", { name: "New note" })).toBeInTheDocument();
+    });
+
+    it("opens the composer pre-filled from an 'Add as goal' link", async () => {
+        mockSearch = new URLSearchParams("compose=1&title=Learn+Kafka&category=Goal&color=error");
+        render(<NotesPage />);
+
+        expect(await screen.findByRole("heading", { name: "New note" })).toBeInTheDocument();
+        expect(screen.getByDisplayValue("Learn Kafka")).toBeInTheDocument();
+        expect(screen.getByDisplayValue("Goal")).toBeInTheDocument();
     });
 });
 

@@ -1,7 +1,8 @@
 "use client";
 
-import { useMemo, useState } from "react";
+import { Suspense, useEffect, useMemo, useState } from "react";
 import { motion, AnimatePresence } from "framer-motion";
+import { useSearchParams } from "next/navigation";
 import {
     Plus, Pin, PinOff, Pencil, Trash2, Check, CalendarDays, X, Target, NotebookPen,
     Search, ListChecks, CircleCheck, Clock, AlertTriangle,
@@ -37,12 +38,37 @@ const dot: Record<string, string> = {
 
 const emptyForm = { title: "", content: "", category: "Goal", color: "primary", target_date: "" };
 
+// useSearchParams must sit under a Suspense boundary for the production build.
 export default function NotesPage() {
+    return (
+        <Suspense fallback={<div className="max-w-5xl mx-auto"><Skeleton className="h-9 w-56" /></div>}>
+            <NotesContent />
+        </Suspense>
+    );
+}
+
+function NotesContent() {
     const { data: notes, loading, error, reload } = useApi<Note[]>(() => noteService.getAll());
+    const search$ = useSearchParams();
     const [editing, setEditing] = useState<Note | Record<string, never> | null>(null);
     const [form, setForm] = useState(emptyForm);
     const [saving, setSaving] = useState(false);
     const [actionError, setActionError] = useState<string | null>(null);
+
+    // Open the composer pre-filled when linked from a skill gap ("Add as goal").
+    useEffect(() => {
+        if (search$.get("compose") !== "1") return;
+        setForm({
+            title: search$.get("title") || "",
+            content: search$.get("content") || "",
+            category: search$.get("category") || "Goal",
+            color: search$.get("color") || "primary",
+            target_date: search$.get("target") || "",
+        });
+        setEditing({});
+        // Only on first load of a compose link.
+        // eslint-disable-next-line react-hooks/exhaustive-deps
+    }, []);
     const [filter, setFilter] = useState<string>("all");
     const [search, setSearch] = useState("");
     const [hideCompleted, setHideCompleted] = useState(false);
