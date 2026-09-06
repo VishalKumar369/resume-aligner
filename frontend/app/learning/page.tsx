@@ -149,7 +149,7 @@ function LearningContent() {
     const showPartials = (filter === "all" || filter === "partial") && partials.length > 0;
 
     return (
-        <div className="max-w-5xl mx-auto space-y-4">
+        <div className="max-w-7xl mx-auto space-y-4">
             {/* Header + inline stats + progress */}
             <div className="flex items-start justify-between gap-4 flex-wrap">
                 <div className="min-w-0">

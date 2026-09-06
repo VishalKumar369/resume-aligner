@@ -22,7 +22,7 @@ export default function SettingsPage() {
             <div className="flex-1 flex flex-col overflow-hidden">
                 <TopNavbar title="Settings" />
                 <main className="flex-1 overflow-y-auto p-6">
-                    <div className="max-w-2xl mx-auto space-y-6">
+                    <div className="max-w-7xl mx-auto space-y-6">
                         <div>
                             <h1 className="text-2xl font-bold">Settings</h1>
                             <p className="text-sm text-muted mt-1">Manage your account preferences</p>
@@ -31,11 +31,15 @@ export default function SettingsPage() {
                         {loading && <SettingsSkeleton />}
                         {error && !loading && <ErrorState message={error} onRetry={reload} />}
                         {data && !loading && (
-                            <>
+                            // Two columns on wider screens: profile on the left,
+                            // notifications + account on the right; stacked on mobile.
+                            <div className="grid md:grid-cols-2 gap-6">
                                 <ProfileSection profile={data.profile} />
-                                <NotificationsSection notifications={data.notifications} />
-                                <DataPrivacySection onDeleted={() => router.replace("/auth/login")} />
-                            </>
+                                <div className="flex flex-col gap-6">
+                                    <NotificationsSection notifications={data.notifications} />
+                                    <DataPrivacySection onDeleted={() => router.replace("/auth/login")} />
+                                </div>
+                            </div>
                         )}
                     </div>
                 </main>
@@ -63,18 +67,20 @@ function SectionCard({
     title,
     children,
     delay = 0,
+    className = "",
 }: {
     icon: typeof User;
     title: string;
     children: React.ReactNode;
     delay?: number;
+    className?: string;
 }) {
     return (
         <motion.div
             initial={{ opacity: 0, y: 16 }}
             animate={{ opacity: 1, y: 0 }}
             transition={{ delay }}
-            className="card-elevated rounded-2xl p-6"
+            className={`card-elevated rounded-2xl p-6 ${className}`}
         >
             <div className="flex items-center gap-3 mb-5">
                 <div className="p-2 bg-surface-2 rounded-lg">
@@ -117,7 +123,7 @@ function ProfileSection({ profile }: { profile: MeResponse["profile"] }) {
     };
 
     return (
-        <SectionCard icon={User} title="Profile" delay={0}>
+        <SectionCard icon={User} title="Profile" delay={0} className="h-full">
             <div className="space-y-4">
                 <div>
                     <label className="block text-xs font-medium text-muted mb-2">Full Name</label>
@@ -265,7 +271,7 @@ function DataPrivacySection({ onDeleted }: { onDeleted: () => void }) {
 
     return (
         <>
-            <SectionCard icon={Download} title="Data & Privacy" delay={0.16}>
+            <SectionCard icon={Download} title="Data & Privacy" delay={0.16} className="flex-1">
                 <div className="flex flex-wrap gap-3">
                     <button
                         onClick={handleExport}
