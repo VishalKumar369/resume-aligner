@@ -153,7 +153,7 @@ function LearningContent() {
             {/* Header + inline stats + progress */}
             <div className="flex items-start justify-between gap-4 flex-wrap">
                 <div className="min-w-0">
-                    <h1 className="text-xl font-semibold tracking-tight">Learning Roadmap</h1>
+                    <h1 className="text-2xl font-bold">Learning Roadmap</h1>
                     <div className="flex flex-wrap items-center gap-x-3 gap-y-1 mt-1.5 text-xs text-muted">
                         <span className="inline-flex items-center gap-1"><Layers className="w-3.5 h-3.5" /> {modules.length} modules</span>
                         <span className="inline-flex items-center gap-1"><Clock className="w-3.5 h-3.5" /> {data.total_duration}</span>

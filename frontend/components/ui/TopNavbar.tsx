@@ -49,7 +49,7 @@ export function TopNavbar({ title }: { title?: string }) {
     };
 
     return (
-        <header className="h-14 flex items-center justify-between gap-2 px-4 sm:px-5 border-b border-border bg-card/80 backdrop-blur-sm sticky top-0 z-40">
+        <header className="h-16 flex items-center justify-between gap-2 px-4 sm:px-6 border-b border-border bg-card/80 backdrop-blur-sm sticky top-0 z-40">
             <div className="flex items-center gap-2 sm:gap-3 min-w-0">
                 <button
                     onClick={openMobileNav}
@@ -64,10 +64,10 @@ export function TopNavbar({ title }: { title?: string }) {
             </div>
 
             {/* Search */}
-            <div className="hidden md:flex items-center gap-2 bg-surface border border-border rounded-lg px-2.5 py-1.5 w-56 text-xs text-muted">
-                <Search className="w-3.5 h-3.5 flex-shrink-0" />
+            <div className="hidden md:flex items-center gap-2 bg-surface border border-border rounded-xl px-3 py-2 w-3/12 text-sm text-muted">
+                <Search className="w-4 h-4 flex-shrink-0" />
                 <span>Search resumes, companies…</span>
-                <kbd className="ml-auto text-[10px] bg-surface-2 text-muted px-1.5 py-0.5 rounded border border-border">⌘K</kbd>
+                <kbd className="ml-auto text-xs bg-surface-2 text-muted px-1.5 py-0.5 rounded border border-border">⌘K</kbd>
             </div>
 
             <div className="flex items-center gap-1.5 sm:gap-3 flex-shrink-0">

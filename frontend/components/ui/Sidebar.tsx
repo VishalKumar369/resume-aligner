@@ -25,16 +25,10 @@ const navItems = [
             { href: "/dashboard/resume-versions", icon: FolderKanban, label: "Resume Versions" },
         ],
     },
-    {
-        label: "Targeting",
-        isGroup: true,
-        children: [
-            // `match` keeps Company Intel active on the per-analysis insight
-            // pages too (/company/<slug>?jd=...), not just the index.
-            { href: "/company", match: "/company", icon: Building2, label: "Company Intel" },
-            { href: "/learning", icon: BookOpen, label: "Learning Roadmap" },
-        ],
-    },
+    { href: "/learning", icon: BookOpen, label: "Learning Roadmap" },
+    // The index lists every company; `match` also keeps the tab active on the
+    // per-analysis insight pages (/company/<slug>?jd=...).
+    { href: "/company", match: "/company", icon: Building2, label: "Company Intel" },
     {
         label: "Personal",
         isGroup: true,
@@ -42,13 +36,7 @@ const navItems = [
             { href: "/notes", icon: NotebookPen, label: "Notes" },
         ],
     },
-    {
-        label: "Account",
-        isGroup: true,
-        children: [
-            { href: "/settings", icon: Settings, label: "Settings" },
-        ],
-    },
+    { href: "/settings", icon: Settings, label: "Settings" },
 ];
 
 export function Sidebar() {
@@ -61,19 +49,19 @@ export function Sidebar() {
             {/* Desktop: static, collapsible rail (hidden on small screens). */}
             <motion.aside
                 initial={false}
-                animate={{ width: collapsed ? 64 : 220 }}
+                animate={{ width: collapsed ? 68 : 240 }}
                 transition={{ duration: 0.25, ease: "easeInOut" }}
                 className="relative hidden md:flex flex-col h-full bg-card border-r border-border overflow-hidden flex-shrink-0"
             >
                 <SidebarLogo collapsed={collapsed} />
-                <nav className="flex-1 p-2 space-y-0.5 overflow-y-auto overflow-x-hidden">
+                <nav className="flex-1 p-3 space-y-1 overflow-y-auto overflow-x-hidden">
                     <SidebarNav collapsed={collapsed} pathname={pathname} />
                 </nav>
-                <div className="p-2 border-t border-border">
+                <div className="p-3 border-t border-border">
                     <button
                         onClick={() => setCollapsed(!collapsed)}
                         className={cn(
-                            "w-full flex items-center gap-2.5 px-2.5 py-1.5 rounded-md text-[13px] text-muted-foreground hover:text-foreground hover:bg-surface-2 transition-colors duration-150",
+                            "w-full flex items-center gap-3 px-3 py-2 rounded-lg text-muted hover:text-foreground hover:bg-surface-2 transition-all duration-200",
                             collapsed && "justify-center"
                         )}
                     >
@@ -105,12 +93,12 @@ export function Sidebar() {
                             transition={{ type: "tween", duration: 0.25, ease: "easeInOut" }}
                             className="absolute left-0 top-0 h-full w-[80%] max-w-xs bg-card border-r border-border flex flex-col"
                         >
-                            <div className="h-14 flex items-center justify-between px-3 border-b border-border flex-shrink-0">
-                                <div className="flex items-center gap-2.5">
-                                    <div className="w-7 h-7 rounded-md bg-primary flex items-center justify-center flex-shrink-0">
-                                        <FileText className="w-3.5 h-3.5 text-primary-foreground" />
+                            <div className="h-16 flex items-center justify-between px-4 border-b border-border flex-shrink-0">
+                                <div className="flex items-center gap-3">
+                                    <div className="w-8 h-8 rounded-lg bg-primary flex items-center justify-center flex-shrink-0">
+                                        <FileText className="w-4 h-4 text-primary-foreground" />
                                     </div>
-                                    <span className="font-semibold text-[13px] tracking-tight">{PLATFORM_NAME}</span>
+                                    <span className="font-bold text-sm">{PLATFORM_NAME}</span>
                                 </div>
                                 <button
                                     onClick={closeMobileNav}
@@ -120,7 +108,7 @@ export function Sidebar() {
                                     <X className="w-5 h-5" />
                                 </button>
                             </div>
-                            <nav className="flex-1 p-2 space-y-0.5 overflow-y-auto">
+                            <nav className="flex-1 p-3 space-y-1 overflow-y-auto">
                                 <SidebarNav collapsed={false} pathname={pathname} onNavigate={closeMobileNav} />
                             </nav>
                         </motion.aside>
@@ -133,23 +121,22 @@ export function Sidebar() {
 
 function SidebarLogo({ collapsed }: { collapsed: boolean }) {
     return (
-        <div className="h-14 flex items-center px-3 border-b border-border flex-shrink-0">
-            <Link href="/dashboard" className="flex items-center gap-2.5 overflow-hidden">
-                <div className="w-7 h-7 rounded-md bg-primary flex items-center justify-center flex-shrink-0">
-                    <FileText className="w-3.5 h-3.5 text-primary-foreground" />
+        <div className="h-16 flex items-center px-4 border-b border-border flex-shrink-0">
+            <Link href="/dashboard" className="flex items-center gap-3 overflow-hidden">
+                <div className="w-8 h-8 rounded-lg bg-primary flex items-center justify-center flex-shrink-0">
+                    <FileText className="w-4 h-4 text-primary-foreground" />
                 </div>
                 <AnimatePresence>
                     {!collapsed && (
-                        <motion.div
+                        <motion.span
                             initial={{ opacity: 0, width: 0 }}
                             animate={{ opacity: 1, width: "auto" }}
                             exit={{ opacity: 0, width: 0 }}
                             transition={{ duration: 0.2 }}
-                            className="overflow-hidden whitespace-nowrap leading-tight"
+                            className="font-bold text-sm whitespace-nowrap overflow-hidden"
                         >
-                            <div className="font-semibold text-[13px] tracking-tight">{PLATFORM_NAME}</div>
-                            <div className="text-[10px] text-muted font-mono">process.env.APP_NAME</div>
-                        </motion.div>
+                            {PLATFORM_NAME}
+                        </motion.span>
                     )}
                 </AnimatePresence>
             </Link>
@@ -172,22 +159,22 @@ function SidebarNav({
             {navItems.map((item) => {
                 if ("isGroup" in item && item.isGroup) {
                     return (
-                        <div key={item.label} className="pt-4">
+                        <div key={item.label} className="pt-3">
                             <AnimatePresence>
                                 {!collapsed && (
                                     <motion.div
                                         initial={{ opacity: 0 }}
                                         animate={{ opacity: 1 }}
                                         exit={{ opacity: 0 }}
-                                        className="px-2.5 pb-1"
+                                        className="px-3 pb-1"
                                     >
-                                        <span className="section-label">
+                                        <span className="text-xs font-semibold text-muted uppercase tracking-wider">
                                             {item.label}
                                         </span>
                                     </motion.div>
                                 )}
                             </AnimatePresence>
-                            <div className="space-y-0.5">
+                            <div className="space-y-1">
                                 {item.children?.map((child) => (
                                     <NavLink key={child.href} item={child} collapsed={collapsed} pathname={pathname} onNavigate={onNavigate} />
                                 ))}
@@ -222,10 +209,10 @@ function NavLink({
         <Link href={item.href} onClick={onNavigate}>
             <div
                 className={cn(
-                    "flex items-center gap-2.5 px-2.5 py-1.5 rounded-md text-[13px] transition-colors duration-150 cursor-pointer group",
+                    "flex items-center gap-3 px-3 py-2 rounded-lg transition-all duration-200 cursor-pointer group",
                     isActive
-                        ? "bg-primary/10 text-primary font-medium"
-                        : "text-muted-foreground hover:text-foreground hover:bg-surface-2",
+                        ? "bg-primary/15 text-primary border border-primary/20"
+                        : "text-muted hover:text-foreground hover:bg-surface-2",
                     collapsed && "justify-center"
                 )}
             >

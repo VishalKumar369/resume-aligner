@@ -183,7 +183,7 @@ function CompanyPageContent() {
                                         <Building2 className="w-7 h-7 text-primary" />
                                     </div>
                                     <div className="min-w-0">
-                                        <h1 className="text-xl font-semibold tracking-tight truncate">{jd.title || "This role"}</h1>
+                                        <h1 className="text-2xl font-bold truncate">{jd.title || "This role"}</h1>
                                         <p className="text-sm text-muted mt-1">
                                             {[jd.company_name, jd.structured_data?.seniority, jd.structured_data?.location, jd.structured_data?.work_mode]
                                                 .filter(Boolean).join(" · ") || "Selected analysis"}
@@ -384,7 +384,7 @@ function CompanyPageContent() {
                                     <Building2 className="w-8 h-8 text-primary" />
                                 </div>
                                 <div>
-                                    <h1 className="text-xl font-semibold tracking-tight">{insights.company}</h1>
+                                    <h1 className="text-2xl font-bold">{insights.company}</h1>
                                     <p className="text-sm text-muted mt-1">
                                         {insights.jd_count} saved posting{insights.jd_count === 1 ? "" : "s"}
                                         {insights.locations?.length > 0 && ` · ${insights.locations.join(", ")}`}

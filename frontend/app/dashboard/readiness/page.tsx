@@ -54,7 +54,7 @@ export default function ReadinessPage() {
     return (
         <div className="max-w-6xl mx-auto space-y-6">
             <div>
-                <h1 className="text-xl font-semibold tracking-tight">Career Readiness</h1>
+                <h1 className="text-2xl font-bold">Career Readiness</h1>
                 <p className="text-sm text-muted mt-1">
                     Averaged across {summary.totals.target_roles} target role{summary.totals.target_roles === 1 ? "" : "s"}
                 </p>

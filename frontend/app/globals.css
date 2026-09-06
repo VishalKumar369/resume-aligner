@@ -14,58 +14,54 @@
     /* Tells the browser to render native controls (date picker, scrollbars)
        for a dark UI, so the date input's calendar icon is light and visible. */
     color-scheme: dark;
-    /* Zinc-based near-black surfaces, layered bg → card → surface → surface-2,
-       with indigo + cyan accents (matches the product design system). */
-    --background: 9 9 11;
+    --background: 10 10 15;
     --foreground: 250 250 250;
-    --card: 17 17 19;
-    --surface: 24 24 27;
-    --surface-2: 31 31 35;
-    --border: 39 39 42;
+    --card: 17 17 24;
+    --surface: 22 22 31;
+    --surface-2: 28 28 40;
+    --border: 30 30 46;
     --muted: 113 113 122;
     --muted-foreground: 161 161 170;
     --primary: 99 102 241;
-    --primary-hover: 79 82 224;
+    --primary-hover: 79 70 229;
     --primary-foreground: 255 255 255;
-    --accent: 34 211 238;
-    --success: 74 222 128;
-    --warning: 251 191 36;
-    --error: 248 113 113;
+    --accent: 167 139 250;
+    --success: 34 197 94;
+    --warning: 245 158 11;
+    --error: 239 68 68;
 
-    /* Cards read flat: a hairline ring + a whisper of depth, no heavy glow. */
-    --card-shadow: 0 0 0 1px rgba(255, 255, 255, 0.04), 0 1px 2px rgba(0, 0, 0, 0.3);
-    --glass-bg: rgba(17, 17, 19, 0.8);
-    --glass-border: rgba(255, 255, 255, 0.08);
-    --scrollbar: 39 39 42;
-    --scrollbar-hover: 63 63 70;
+    --card-shadow: 0 0 0 1px rgba(255, 255, 255, 0.03), 0 4px 24px rgba(0, 0, 0, 0.4);
+    --glass-bg: rgba(17, 17, 24, 0.8);
+    --glass-border: rgba(255, 255, 255, 0.06);
+    --scrollbar: 30 30 46;
+    --scrollbar-hover: 46 46 62;
     --selection: 99 102 241;
   }
 
   .light {
     /* Light native controls, so the calendar icon reads dark on the light UI. */
     color-scheme: light;
-    /* A clean zinc light theme mirroring the dark palette's structure. */
-    --background: 244 244 245;
-    --foreground: 24 24 27;
+    --background: 243 244 251;
+    --foreground: 17 18 28;
     --card: 255 255 255;
-    --surface: 250 250 250;
-    --surface-2: 244 244 245;
-    --border: 228 228 231;
-    --muted: 113 113 122;
-    --muted-foreground: 82 82 91;
+    --surface: 255 255 255;
+    --surface-2: 238 240 248;
+    --border: 224 227 238;
+    --muted: 100 106 122;
+    --muted-foreground: 61 68 88;
     --primary: 99 102 241;
     --primary-hover: 79 70 229;
     --primary-foreground: 255 255 255;
-    --accent: 8 145 178;
+    --accent: 124 58 237;
     --success: 22 163 74;
     --warning: 217 119 6;
     --error: 220 38 38;
 
-    --card-shadow: 0 1px 2px rgba(16, 24, 40, 0.04), 0 1px 3px rgba(16, 24, 40, 0.06);
-    --glass-bg: rgba(255, 255, 255, 0.8);
-    --glass-border: rgba(15, 17, 23, 0.06);
-    --scrollbar: 212 212 216;
-    --scrollbar-hover: 161 161 170;
+    --card-shadow: 0 1px 2px rgba(16, 24, 40, 0.06), 0 8px 24px rgba(16, 24, 40, 0.08);
+    --glass-bg: rgba(255, 255, 255, 0.75);
+    --glass-border: rgba(15, 17, 23, 0.08);
+    --scrollbar: 209 213 219;
+    --scrollbar-hover: 156 163 175;
     --selection: 99 102 241;
   }
 
@@ -176,44 +172,20 @@
   }
 
   .btn-primary {
-    @apply bg-primary hover:bg-primary-hover text-primary-foreground font-medium px-4 py-2 rounded-lg transition-all duration-200 active:scale-95;
+    @apply bg-primary hover:bg-primary-hover text-primary-foreground font-semibold px-5 py-2.5 rounded-xl transition-all duration-200 hover:shadow-glow-sm active:scale-95;
   }
 
   .btn-ghost {
-    @apply bg-transparent hover:bg-surface-2 text-muted-foreground hover:text-foreground font-medium px-4 py-2 rounded-lg border border-border transition-all duration-200;
+    @apply bg-transparent hover:bg-surface text-muted-foreground hover:text-foreground font-medium px-4 py-2 rounded-lg transition-all duration-200;
   }
 
   .input-field {
-    @apply w-full bg-surface border border-border rounded-lg px-3 py-2 text-sm text-foreground placeholder:text-muted focus:outline-none focus:ring-2 focus:ring-primary/40 focus:border-primary/50 transition-all duration-200;
+    @apply w-full bg-surface border border-border rounded-xl px-4 py-3 text-sm text-foreground placeholder:text-muted focus:outline-none focus:ring-2 focus:ring-primary/50 focus:border-primary/50 transition-all duration-200;
   }
 
   .score-high { @apply text-success; }
   .score-medium { @apply text-warning; }
   .score-low { @apply text-error; }
-
-  /* ---- Prototype primitives (compact, flat, zinc) ---- */
-
-  /* Uppercase micro-label used above nav groups and card sections. */
-  .section-label {
-    @apply text-[10px] font-medium text-muted uppercase tracking-[0.08em];
-  }
-
-  /* Stat card: uppercase label (+ optional icon), large number, small badge. */
-  .stat-label { @apply text-[11px] font-medium text-muted uppercase tracking-[0.06em] flex items-center gap-1.5; }
-  .stat-value { @apply text-[28px] font-semibold leading-none tracking-tight; }
-  .stat-badge { @apply inline-flex items-center gap-1 text-[10px] px-2 py-0.5 rounded-full font-medium; }
-
-  /* Score pill (table cells, badges). */
-  .score-pill { @apply inline-flex items-center text-[11px] font-medium px-2 py-0.5 rounded-full; }
-  .pill-high { @apply bg-success/10 text-success; }
-  .pill-mid { @apply bg-warning/10 text-warning; }
-  .pill-low { @apply bg-error/10 text-error; }
-
-  /* Skill tag chips. */
-  .skill-tag { @apply text-[11px] px-2.5 py-1 rounded-md border border-border bg-surface-2 text-muted-foreground; }
-  .skill-tag.missing { @apply border-error/30 text-error bg-error/[0.08]; }
-  .skill-tag.partial { @apply border-warning/30 text-warning bg-warning/[0.08]; }
-  .skill-tag.strong { @apply border-success/30 text-success bg-success/[0.08]; }
 }
 
 @layer utilities {
