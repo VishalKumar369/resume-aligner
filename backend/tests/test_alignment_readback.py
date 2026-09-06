@@ -6,8 +6,8 @@ from types import SimpleNamespace
 import pytest
 from starlette.datastructures import Headers, UploadFile
 
-from app.api.v1 import resume_routes
-from app.api.v1.alignment_routes import _to_detail, _to_summary
+from app.api.v1 import alignment_routes, resume_routes
+from app.api.v1.alignment_routes import _to_detail, _to_summary, delete_alignment
 
 
 def stored_row(**overrides):
@@ -127,6 +127,101 @@ class TestDetailMapping:
 
 
 OWNER_ID = uuid.uuid4()
+
+
+class _Result:
+    def __init__(self, first_value):
+        self._first = first_value
+
+    def first(self):
+        return self._first
+
+
+class _FakeDB:
+    """Enough of an AsyncSession for the delete cascade: the first execute is the
+    sibling-run SELECT, any later one is the versions UPDATE."""
+
+    def __init__(self, *, sibling=None, jd=None):
+        self._sibling = sibling
+        self._jd = jd
+        self.execute_calls = 0
+        self.versions_retired = False
+        self.committed = False
+
+    async def execute(self, _stmt):
+        self.execute_calls += 1
+        if self.execute_calls == 1:
+            return _Result(self._sibling)
+        self.versions_retired = True
+        return _Result(None)
+
+    async def get(self, _model, _id):
+        return self._jd
+
+    async def commit(self):
+        self.committed = True
+
+
+def _stub_delete_repo(monkeypatch, row, owned=True):
+    class FakeRepo:
+        def __init__(self, model, db):
+            pass
+
+        async def get(self, _id):
+            return row
+
+        async def is_owned_by(self, _row, _owner_id, _db):
+            return owned
+
+    monkeypatch.setattr(alignment_routes, "AlignmentRepository", FakeRepo)
+
+
+class TestDeleteAlignment:
+    @pytest.mark.asyncio
+    async def test_retires_the_jd_and_versions_when_it_was_the_last_run(self, monkeypatch):
+        row = stored_row(is_deleted=False)
+        jd = SimpleNamespace(id=row.jd_id, owner_id=OWNER_ID, is_deleted=False)
+        _stub_delete_repo(monkeypatch, row)
+        db = _FakeDB(sibling=None, jd=jd)
+
+        result = await delete_alignment(alignment_id=row.id, db=db, owner_id=OWNER_ID)
+
+        assert result.status_code == 204
+        assert row.is_deleted is True          # the analysis
+        assert jd.is_deleted is True           # the posting (leaves Company Intel)
+        assert db.versions_retired is True     # its tailored resume versions
+        assert db.committed is True
+
+    @pytest.mark.asyncio
+    async def test_keeps_the_jd_when_a_sibling_run_remains(self, monkeypatch):
+        row = stored_row(is_deleted=False)
+        jd = SimpleNamespace(id=row.jd_id, owner_id=OWNER_ID, is_deleted=False)
+        _stub_delete_repo(monkeypatch, row)
+        # A re-run of the same posting still exists.
+        db = _FakeDB(sibling=SimpleNamespace(id=uuid.uuid4()), jd=jd)
+
+        await delete_alignment(alignment_id=row.id, db=db, owner_id=OWNER_ID)
+
+        assert row.is_deleted is True
+        assert jd.is_deleted is False          # other runs still need it
+        assert db.versions_retired is False
+        assert db.committed is True
+
+    @pytest.mark.asyncio
+    async def test_missing_run_is_a_404(self, monkeypatch):
+        _stub_delete_repo(monkeypatch, row=None)
+
+        with pytest.raises(Exception) as caught:
+            await delete_alignment(alignment_id=uuid.uuid4(), db=_FakeDB(), owner_id=OWNER_ID)
+        assert getattr(caught.value, "status_code", None) == 404
+
+    @pytest.mark.asyncio
+    async def test_another_users_run_is_a_404(self, monkeypatch):
+        _stub_delete_repo(monkeypatch, row=stored_row(is_deleted=False), owned=False)
+
+        with pytest.raises(Exception) as caught:
+            await delete_alignment(alignment_id=uuid.uuid4(), db=_FakeDB(), owner_id=OWNER_ID)
+        assert getattr(caught.value, "status_code", None) == 404
 
 
 def _upload(payload: bytes = b"%PDF-1.4 fake", filename: str = "resume.pdf") -> UploadFile:

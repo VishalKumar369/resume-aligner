@@ -6,7 +6,7 @@ import DashboardPage from "@/app/dashboard/page";
 import { alignmentService } from "@/services/api";
 
 vi.mock("@/services/api", () => ({
-    alignmentService: { getAll: vi.fn(), getById: vi.fn() },
+    alignmentService: { getAll: vi.fn(), getById: vi.fn(), remove: vi.fn() },
     // AnalysisTrackerTable builds insight links with this.
     companySlug: (n: string) => (n || "").toLowerCase().replace(/[^a-z0-9]+/g, "-").replace(/^-+|-+$/g, ""),
     apiErrorMessage: (e: any) => e?.message ?? "error",
@@ -79,7 +79,7 @@ describe("DashboardPage — per-analysis view", () => {
 
         expect(screen.getByText(/2 analyses · 1 resume · 2 roles/)).toBeInTheDocument();
         const table = screen.getByRole("table");
-        expect(within(table).getAllByRole("button")).toHaveLength(2);
+        expect(within(table).getAllByRole("button", { name: /Select analysis/i })).toHaveLength(2);
     });
 
     it("switches the whole view when another run is selected", async () => {
@@ -98,5 +98,18 @@ describe("DashboardPage — per-analysis view", () => {
         expect(await screen.findByText("Add a metric to your top bullet.")).toBeInTheDocument();
         // Missing skill becomes an actionable recommendation.
         expect(screen.getByText(/Add evidence of Kafka/i)).toBeInTheDocument();
+    });
+
+    it("deletes a run after a two-step confirm", async () => {
+        vi.mocked(alignmentService.remove).mockResolvedValue({} as any);
+        render(<DashboardPage />);
+        await screen.findByRole("heading", { name: /Acme Corp/i, level: 2 });
+
+        // First click asks for confirmation; nothing is deleted yet.
+        await userEvent.click(screen.getByLabelText(/Delete analysis for Globex/i));
+        expect(alignmentService.remove).not.toHaveBeenCalled();
+
+        await userEvent.click(screen.getByRole("button", { name: "Delete" }));
+        await waitFor(() => expect(alignmentService.remove).toHaveBeenCalledWith("a-2"));
     });
 });

@@ -22,7 +22,17 @@ const CustomTooltip = ({ active, payload }: any) => {
  * Each axis is one scoring component from the latest alignment, so the shape
  * shows where the match is actually strong or weak.
  */
-export function CareerRadarChart({ axes, className }: { axes: Axis[]; className?: string }) {
+export function CareerRadarChart({
+    axes,
+    className,
+    title = "Alignment Breakdown",
+    subtitle = "How your latest match scored, component by component",
+}: {
+    axes: Axis[];
+    className?: string;
+    title?: string;
+    subtitle?: string;
+}) {
     const hasEnoughAxes = axes.length >= 3;
 
     return (
@@ -33,8 +43,8 @@ export function CareerRadarChart({ axes, className }: { axes: Axis[]; className?
             className={cn("card-elevated rounded-2xl p-6", className)}
         >
             <div className="mb-4">
-                <h3 className="text-sm font-semibold text-foreground">Alignment Breakdown</h3>
-                <p className="text-xs text-muted mt-1">How your latest match scored, component by component</p>
+                <h3 className="text-sm font-semibold text-foreground">{title}</h3>
+                <p className="text-xs text-muted mt-1">{subtitle}</p>
             </div>
 
             {hasEnoughAxes ? (

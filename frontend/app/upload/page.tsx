@@ -293,11 +293,11 @@ export default function UploadPage() {
                                     </p>
                                 </div>
 
-                                <div className="grid md:grid-cols-2 gap-6 items-start">
+                                <div className="grid md:grid-cols-2 gap-6">
                                     {/* The resume already parsed in step 1. */}
-                                    <div>
+                                    <div className="flex flex-col">
                                         <p className="text-sm font-medium text-muted mb-2">Resume uploaded</p>
-                                        <div className="card-elevated rounded-2xl p-4 flex items-center gap-3">
+                                        <div className="card-elevated rounded-2xl p-4 flex flex-1 items-center gap-3">
                                             <div className="w-10 h-10 rounded-lg bg-primary/10 flex items-center justify-center flex-shrink-0">
                                                 <FileText className="w-5 h-5 text-primary" />
                                             </div>
@@ -312,12 +312,12 @@ export default function UploadPage() {
                                     </div>
 
                                     {/* Prompt — the working paste box sits directly below. */}
-                                    <div>
+                                    <div className="flex flex-col">
                                         <p className="text-sm font-medium text-muted mb-2">Job description</p>
                                         <button
                                             type="button"
                                             onClick={() => jdTextareaRef.current?.focus()}
-                                            className="w-full card-elevated rounded-2xl border-2 border-dashed border-border p-8 text-center hover:border-primary/50 transition-colors"
+                                            className="w-full flex-1 flex flex-col items-center justify-center card-elevated rounded-2xl border-2 border-dashed border-border p-8 text-center hover:border-primary/50 transition-colors"
                                         >
                                             <div className="w-12 h-12 rounded-xl bg-surface-2 flex items-center justify-center mx-auto mb-3">
                                                 <Upload className="w-6 h-6 text-muted" />

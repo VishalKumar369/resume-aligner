@@ -133,6 +133,9 @@ export const alignmentService = {
     getAll: (params?: { resume_id?: string; jd_id?: string; latest_only?: boolean; limit?: number }) =>
         api.get("/alignment/list", { params }),
     getById: (alignmentId: string) => api.get(`/alignment/${alignmentId}`),
+    // Deletes the run; if it was the JD's last analysis, its posting and
+    // tailored versions go too (see the backend delete endpoint).
+    remove: (alignmentId: string) => api.delete(`/alignment/${alignmentId}`),
 };
 
 // ------------------------------------------------------- dashboard & learning

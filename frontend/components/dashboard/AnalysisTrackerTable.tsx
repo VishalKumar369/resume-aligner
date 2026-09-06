@@ -3,7 +3,7 @@
 import { useEffect, useState } from "react";
 import { motion } from "framer-motion";
 import Link from "next/link";
-import { ExternalLink, ChevronLeft, ChevronRight } from "lucide-react";
+import { ExternalLink, ChevronLeft, ChevronRight, Trash2 } from "lucide-react";
 import { cn, getScoreColor, formatScore } from "@/lib/utils";
 import { companySlug } from "@/services/api";
 
@@ -52,13 +52,18 @@ export function AnalysisTrackerTable({
     analyses,
     activeId,
     onSelect,
+    onDelete,
 }: {
     analyses: AnalysisRow[];
     activeId: string | null;
     onSelect: (id: string) => void;
+    // Deletes a run. When omitted, no delete affordance is shown.
+    onDelete?: (id: string) => void;
 }) {
     const pageCount = Math.max(1, Math.ceil(analyses.length / PAGE_SIZE));
     const [page, setPage] = useState(0);
+    // Which row is awaiting delete confirmation (two-step, no accidental loss).
+    const [confirmId, setConfirmId] = useState<string | null>(null);
 
     // Clamp if the list shrank (e.g. after a reload) so the page stays valid.
     useEffect(() => {
@@ -135,13 +140,47 @@ export function AnalysisTrackerTable({
                                                 {row.created_at ? new Date(row.created_at).toLocaleDateString() : "—"}
                                             </td>
                                             <td className="p-4 text-right">
-                                                <Link
-                                                    href={insightsHref(row)}
+                                                <div
+                                                    className="inline-flex items-center gap-3 justify-end"
                                                     onClick={(e) => e.stopPropagation()}
-                                                    className="inline-flex items-center gap-1 text-xs text-primary hover:underline"
                                                 >
-                                                    Insights <ExternalLink className="w-3 h-3" />
-                                                </Link>
+                                                    {confirmId === row.id ? (
+                                                        <span className="inline-flex items-center gap-2 text-xs">
+                                                            <span className="text-muted">Delete this analysis?</span>
+                                                            <button
+                                                                onClick={() => { onDelete?.(row.id); setConfirmId(null); }}
+                                                                className="font-medium text-error hover:underline"
+                                                            >
+                                                                Delete
+                                                            </button>
+                                                            <button
+                                                                onClick={() => setConfirmId(null)}
+                                                                className="text-muted hover:text-foreground"
+                                                            >
+                                                                Cancel
+                                                            </button>
+                                                        </span>
+                                                    ) : (
+                                                        <>
+                                                            <Link
+                                                                href={insightsHref(row)}
+                                                                className="inline-flex items-center gap-1 text-xs text-primary hover:underline"
+                                                            >
+                                                                Insights <ExternalLink className="w-3 h-3" />
+                                                            </Link>
+                                                            {onDelete && (
+                                                                <button
+                                                                    onClick={() => setConfirmId(row.id)}
+                                                                    aria-label={`Delete analysis for ${row.company || "Unknown company"}`}
+                                                                    title="Delete analysis"
+                                                                    className="p-1 rounded-md text-muted hover:text-error hover:bg-error/10 transition-colors"
+                                                                >
+                                                                    <Trash2 className="w-3.5 h-3.5" />
+                                                                </button>
+                                                            )}
+                                                        </>
+                                                    )}
+                                                </div>
                                             </td>
                                         </tr>
                                     );

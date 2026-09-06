@@ -2,14 +2,17 @@
 
 import { useMemo, useState } from "react";
 import { motion } from "framer-motion";
+import { LineChart, Line, XAxis, YAxis, Tooltip, CartesianGrid, ResponsiveContainer } from "recharts";
 import { Target, Zap, Layers, Briefcase, AlertTriangle } from "lucide-react";
+import { cn } from "@/lib/utils";
 import { StatCard } from "@/components/ui/StatCard";
 import { CareerRadarChart } from "@/components/dashboard/CareerRadarChart";
 import { SkillHeatmap, HeatmapSkill } from "@/components/dashboard/SkillHeatmap";
 import { AnalysisTrackerTable, AnalysisRow } from "@/components/dashboard/AnalysisTrackerTable";
 import { EmptyState, ErrorState, StatSkeletonRow, Skeleton } from "@/components/ui/States";
+import toast from "react-hot-toast";
 import { useApi } from "@/hooks/useApi";
-import { alignmentService } from "@/services/api";
+import { alignmentService, apiErrorMessage } from "@/services/api";
 
 const priorityColor: Record<string, string> = {
     high: "border-l-error",
@@ -43,6 +46,18 @@ export default function DashboardPage() {
         () => analyses?.find((a) => a.id === activeId) || null,
         [analyses, activeId]
     );
+
+    const handleDelete = async (id: string) => {
+        try {
+            await alignmentService.remove(id);
+            // If the deleted run was the pinned selection, fall back to the newest.
+            if (selectedId === id) setSelectedId(null);
+            reload();
+            toast.success("Analysis deleted");
+        } catch (err: any) {
+            toast.error(apiErrorMessage(err, "Couldn't delete the analysis"));
+        }
+    };
 
     if (loading) {
         return (
@@ -125,18 +140,15 @@ export default function DashboardPage() {
                 <StatCard title="Experience Match" value={detail?.experience_match_score ?? 0} icon={Briefcase} scoreType delay={0.15} />
             </div>
 
-            {/* Both panels are the same fixed height; recommendations scroll
-                within theirs so the content can't overflow onto the heatmap. */}
-            <div className="grid lg:grid-cols-3 gap-6 lg:items-start">
-                <div className="lg:col-span-1">
-                    <CareerRadarChart axes={radarAxes} className="lg:h-[440px]" />
-                </div>
+            {/* Row 1: ATS breakdown + recommendations (equal height, each scrolls). */}
+            <div className="grid lg:grid-cols-2 gap-6">
+                <AtsBreakdownPanel axes={radarAxes} analyses={analyses} className="lg:h-[460px]" />
 
                 <motion.div
                     initial={{ opacity: 0, y: 16 }}
                     animate={{ opacity: 1, y: 0 }}
                     transition={{ delay: 0.25 }}
-                    className="lg:col-span-2 card-elevated rounded-2xl p-6 flex flex-col lg:h-[440px]"
+                    className="card-elevated rounded-2xl p-6 flex flex-col lg:h-[460px]"
                 >
                     <h3 className="text-sm font-semibold text-foreground mb-4 flex-shrink-0">Recommended Improvements</h3>
                     {detailLoading ? (
@@ -166,9 +178,85 @@ export default function DashboardPage() {
                 </motion.div>
             </div>
 
-            <SkillHeatmap skills={heatmap} />
+            {/* Row 2: readiness radar + skill heatmap (equal height). */}
+            <div className="grid lg:grid-cols-2 gap-6">
+                <CareerRadarChart axes={radarAxes} title="Readiness radar" className="lg:h-[460px]" />
+                <SkillHeatmap skills={heatmap} className="lg:h-[460px]" />
+            </div>
 
-            <AnalysisTrackerTable analyses={analyses} activeId={activeId} onSelect={setSelectedId} />
+            <AnalysisTrackerTable analyses={analyses} activeId={activeId} onSelect={setSelectedId} onDelete={handleDelete} />
+        </motion.div>
+    );
+}
+
+const BAR_TONES = ["bg-primary", "bg-accent", "bg-success", "bg-warning", "bg-primary"];
+
+/** The selected run's alignment components as bars, plus the ATS trend across
+ *  every run the user has done (oldest → newest). */
+function AtsBreakdownPanel({
+    axes,
+    analyses,
+    className,
+}: {
+    axes: { skill: string; score: number }[];
+    analyses: AnalysisRow[];
+    className?: string;
+}) {
+    const trend = [...analyses]
+        .reverse()
+        .map((a, i) => ({ name: `#${i + 1}`, ats: Math.round(a.ats_score ?? 0) }));
+
+    return (
+        <motion.div
+            initial={{ opacity: 0, y: 16 }}
+            animate={{ opacity: 1, y: 0 }}
+            transition={{ delay: 0.2 }}
+            className={cn("card-elevated rounded-2xl p-6 flex flex-col", className)}
+        >
+            <div className="mb-4 flex-shrink-0">
+                <h3 className="text-sm font-semibold text-foreground">ATS &amp; Alignment breakdown</h3>
+                <p className="text-xs text-muted mt-1">Component scores for this run, and your ATS over time</p>
+            </div>
+
+            <div className="flex-1 min-h-0 overflow-y-auto pr-1">
+                <div className="space-y-2.5">
+                {axes.length ? (
+                    axes.map((axis, i) => (
+                        <div key={axis.skill} className="flex items-center gap-3 text-xs">
+                            <span className="w-32 text-muted capitalize truncate">{axis.skill}</span>
+                            <div className="flex-1 h-2 bg-border rounded-full overflow-hidden">
+                                <div
+                                    className={cn("h-full rounded-full", BAR_TONES[i % BAR_TONES.length])}
+                                    style={{ width: `${Math.round(axis.score)}%` }}
+                                />
+                            </div>
+                            <span className="w-10 text-right text-muted">{Math.round(axis.score)}%</span>
+                        </div>
+                    ))
+                ) : (
+                    <p className="text-xs text-muted">No breakdown to show for this run yet.</p>
+                )}
+            </div>
+
+            {trend.length >= 2 && (
+                <div className="mt-4 pt-4 border-t border-border/60">
+                    <p className="text-xs text-muted mb-2">ATS score across your analyses</p>
+                    <ResponsiveContainer width="100%" height={150}>
+                        <LineChart data={trend} margin={{ top: 6, right: 10, bottom: 0, left: 0 }}>
+                            <CartesianGrid stroke="rgba(128,128,150,0.15)" vertical={false} />
+                            <XAxis dataKey="name" tick={{ fill: "#8A8A9A", fontSize: 10 }} axisLine={false} tickLine={false} />
+                            <YAxis domain={[0, 100]} width={34} ticks={[0, 25, 50, 75, 100]} tick={{ fill: "#8A8A9A", fontSize: 10 }} axisLine={false} tickLine={false} />
+                            <Tooltip
+                                contentStyle={{ background: "rgb(var(--card))", border: "1px solid rgb(var(--border))", borderRadius: 12, fontSize: 12 }}
+                                labelStyle={{ color: "rgb(var(--muted))" }}
+                                formatter={(value: any) => [`${value}%`, "ATS"]}
+                            />
+                            <Line type="monotone" dataKey="ats" stroke="#6366F1" strokeWidth={2} dot={{ r: 3, fill: "#6366F1" }} />
+                        </LineChart>
+                    </ResponsiveContainer>
+                </div>
+            )}
+            </div>
         </motion.div>
     );
 }
