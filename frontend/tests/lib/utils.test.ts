@@ -8,6 +8,7 @@ import {
     getScoreColor,
     getScoreLabel,
     learningLinkForSkill,
+    noteComposeLink,
 } from "@/lib/utils";
 
 describe("learningLinkForSkill", () => {
@@ -15,6 +16,17 @@ describe("learningLinkForSkill", () => {
         expect(learningLinkForSkill("Docker")).toBe("/learning?skill=Docker");
         expect(learningLinkForSkill("CI/CD")).toBe("/learning?skill=CI%2FCD");
         expect(learningLinkForSkill("C++")).toBe("/learning?skill=C%2B%2B");
+    });
+});
+
+describe("noteComposeLink", () => {
+    it("builds a pre-filled composer link", () => {
+        expect(noteComposeLink({ title: "Learn Kafka", category: "Goal", color: "error" }))
+            .toBe("/notes?compose=1&title=Learn+Kafka&category=Goal&color=error");
+    });
+
+    it("includes only the fields provided", () => {
+        expect(noteComposeLink({})).toBe("/notes?compose=1");
     });
 });
 

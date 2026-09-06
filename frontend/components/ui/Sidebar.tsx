@@ -6,7 +6,7 @@ import Link from "next/link";
 import { usePathname } from "next/navigation";
 import {
     LayoutDashboard, Upload, BookOpen, Building2, Settings,
-    FileText, ChevronLeft, ChevronRight, Target, BarChart3, FolderKanban, X,
+    FileText, ChevronLeft, ChevronRight, Target, BarChart3, FolderKanban, X, NotebookPen,
 } from "lucide-react";
 import { cn } from "@/lib/utils";
 import { useUiStore } from "@/store/uiStore";
@@ -29,6 +29,13 @@ const navItems = [
     // The index lists every company; `match` also keeps the tab active on the
     // per-analysis insight pages (/company/<slug>?jd=...).
     { href: "/company", match: "/company", icon: Building2, label: "Company Intel" },
+    {
+        label: "Personal",
+        isGroup: true,
+        children: [
+            { href: "/notes", icon: NotebookPen, label: "Notes" },
+        ],
+    },
     { href: "/settings", icon: Settings, label: "Settings" },
 ];
 

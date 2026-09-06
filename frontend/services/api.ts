@@ -152,6 +152,24 @@ export const companyService = {
     getInsights: (companyId: string) => api.get(`/company/${encodeURIComponent(companyId)}/insights`),
 };
 
+export interface NoteInput {
+    title?: string;
+    content?: string;
+    category?: string;
+    color?: string;
+    target_date?: string | null;
+    is_pinned?: boolean;
+    is_completed?: boolean;
+}
+
+/** Personal planner notes, all scoped to the signed-in user by the JWT. */
+export const noteService = {
+    getAll: () => api.get("/notes"),
+    create: (data: NoteInput) => api.post("/notes", data),
+    update: (id: string, data: NoteInput) => api.patch(`/notes/${id}`, data),
+    remove: (id: string) => api.delete(`/notes/${id}`),
+};
+
 /** Matches the backend's slugify, so links built here resolve server-side. */
 export const companySlug = (name: string) =>
     (name || "").toLowerCase().replace(/[^a-z0-9]+/g, "-").replace(/^-+|-+$/g, "");

@@ -1,6 +1,6 @@
 "use client";
 
-import { useState, useCallback } from "react";
+import { useState, useCallback, useRef } from "react";
 import { motion, AnimatePresence } from "framer-motion";
 import { useDropzone, type FileRejection } from "react-dropzone";
 import { useRouter } from "next/navigation";
@@ -14,11 +14,11 @@ import { ExtractionReview } from "@/components/upload/ExtractionReview";
 import { PriorityBadge } from "@/components/ui/States";
 
 const steps = [
-    { id: 1, title: "Upload Resume" },
-    { id: 2, title: "Add Job Description" },
-    { id: 3, title: "Review Alignment" },
-    { id: 4, title: "Optimize Resume" },
-    { id: 5, title: "View Analytics" },
+    { id: 1, title: "Resume" },
+    { id: 2, title: "Job Description" },
+    { id: 3, title: "Preview" },
+    { id: 4, title: "Optimize" },
+    { id: 5, title: "Analytics" },
 ];
 
 export default function UploadPage() {
@@ -41,6 +41,8 @@ export default function UploadPage() {
     const [optimization, setOptimization] = useState<any>(null);
     const [summary, setSummary] = useState<any>(null);
     const [error, setError] = useState<string | null>(null);
+    // Lets the "Paste JD" prompt jump focus straight to the paste box below it.
+    const jdTextareaRef = useRef<HTMLTextAreaElement>(null);
 
     // react-dropzone hands rejected files to the second argument instead of
     // onDrop's accepted list, so an image or a .txt would otherwise vanish
@@ -188,11 +190,16 @@ export default function UploadPage() {
         (currentStep === 2 && !jd && !jdText.trim());
 
     return (
-        <div className="min-h-screen bg-background flex flex-col items-center justify-center p-4 sm:p-6 relative overflow-hidden">
-            <div className="absolute -top-40 -left-40 w-[500px] h-[500px] rounded-full bg-primary/5 blur-[120px]" />
-            <div className="max-w-2xl w-full">
-                {/* Stepper */}
-                <div className="flex items-center justify-between mb-10">
+        <div className="max-w-7xl mx-auto p-4 sm:p-6">
+            <div className="mb-6">
+                <h1 className="text-2xl font-bold">New analysis</h1>
+                <p className="text-sm text-muted mt-1">
+                    Upload your resume and the job description to begin alignment analysis.
+                </p>
+            </div>
+
+            {/* Stepper */}
+            <div className="flex items-center justify-between mb-8">
                     {steps.map((step, i) => (
                         <div key={step.id} className="flex items-center flex-1 last:flex-none">
                             <div className="flex flex-col items-center gap-1">
@@ -277,38 +284,82 @@ export default function UploadPage() {
                         )}
 
                         {/* ---------------------------------------------- step 2 */}
-                        {currentStep === 2 && (
-                            <div className="card-elevated rounded-2xl p-6 sm:p-8">
-                                <h2 className="text-2xl font-bold mb-2">
-                                    {jd ? "Verify the role & company" : "Add the job description"}
-                                </h2>
-                                <p className="text-muted-foreground text-sm mb-6">
-                                    {jd
-                                        ? "We pulled these from the posting. Fix anything the parser got wrong — they label this analysis across your dashboard and company intelligence."
-                                        : "Paste the full posting. We read the role, company, requirements, and responsibilities from it."}
-                                </p>
+                        {currentStep === 2 && (!jd ? (
+                            <div className="space-y-6">
+                                <div>
+                                    <h2 className="text-lg font-semibold">Add the job description</h2>
+                                    <p className="text-muted-foreground text-sm mt-1">
+                                        Paste the full posting. We read the role, company, requirements, and responsibilities from it.
+                                    </p>
+                                </div>
 
-                                {!jd ? (
-                                    <div className="space-y-4">
-                                        <textarea
-                                            rows={11}
-                                            className="input-field resize-none font-mono text-xs"
-                                            placeholder={"Senior Backend Engineer\nAcme Technologies - Bengaluru (Hybrid)\n\nRequirements\n- 3+ years building backend services\n- Strong Python and FastAPI\n\nNice to have\n- Kafka\n\nResponsibilities\n- Design and own backend services end to end"}
-                                            value={jdText}
-                                            onChange={(e) => setJdText(e.target.value)}
-                                        />
-                                        <div className="flex items-center gap-2 input-field text-sm text-muted">
-                                            <LinkIcon className="w-4 h-4 flex-shrink-0" />
-                                            <input
-                                                className="flex-1 bg-transparent outline-none"
-                                                placeholder="Link to the posting (optional — saved for reference, not fetched)"
-                                                value={jdUrl}
-                                                onChange={(e) => setJdUrl(e.target.value)}
-                                            />
+                                <div className="grid md:grid-cols-2 gap-6 items-start">
+                                    {/* The resume already parsed in step 1. */}
+                                    <div>
+                                        <p className="text-sm font-medium text-muted mb-2">Resume uploaded</p>
+                                        <div className="card-elevated rounded-2xl p-4 flex items-center gap-3">
+                                            <div className="w-10 h-10 rounded-lg bg-primary/10 flex items-center justify-center flex-shrink-0">
+                                                <FileText className="w-5 h-5 text-primary" />
+                                            </div>
+                                            <div className="min-w-0">
+                                                <p className="font-medium truncate">{resume?.filename || uploadedFile?.name || "Your resume"}</p>
+                                                <p className="text-xs text-success mt-0.5 inline-flex items-center gap-1">
+                                                    <CheckCircle className="w-3 h-3" /> Uploaded
+                                                    {uploadedFile ? ` · ${(uploadedFile.size / 1024).toFixed(0)} KB` : ""}
+                                                </p>
+                                            </div>
                                         </div>
                                     </div>
-                                ) : (
-                                    <div className="space-y-4">
+
+                                    {/* Prompt — the working paste box sits directly below. */}
+                                    <div>
+                                        <p className="text-sm font-medium text-muted mb-2">Job description</p>
+                                        <button
+                                            type="button"
+                                            onClick={() => jdTextareaRef.current?.focus()}
+                                            className="w-full card-elevated rounded-2xl border-2 border-dashed border-border p-8 text-center hover:border-primary/50 transition-colors"
+                                        >
+                                            <div className="w-12 h-12 rounded-xl bg-surface-2 flex items-center justify-center mx-auto mb-3">
+                                                <Upload className="w-6 h-6 text-muted" />
+                                            </div>
+                                            <p className="font-medium">Paste the posting below</p>
+                                            <p className="text-xs text-muted mt-1">We extract skills, requirements &amp; keywords automatically</p>
+                                            <span className="btn-primary inline-flex items-center gap-2 text-sm mt-4">
+                                                <LinkIcon className="w-4 h-4" /> Paste JD
+                                            </span>
+                                        </button>
+                                    </div>
+                                </div>
+
+                                <div className="card-elevated rounded-2xl p-5">
+                                    <p className="text-sm font-medium mb-3">Or paste job description text</p>
+                                    <textarea
+                                        ref={jdTextareaRef}
+                                        rows={9}
+                                        className="input-field resize-none font-mono text-xs"
+                                        placeholder={"Paste the full job description here — we'll extract skills, requirements, and keywords automatically..."}
+                                        value={jdText}
+                                        onChange={(e) => setJdText(e.target.value)}
+                                    />
+                                    <div className="flex items-center gap-2 input-field text-sm text-muted mt-3">
+                                        <LinkIcon className="w-4 h-4 flex-shrink-0" />
+                                        <input
+                                            className="flex-1 bg-transparent outline-none"
+                                            placeholder="Link to the posting (optional — saved for reference, not fetched)"
+                                            value={jdUrl}
+                                            onChange={(e) => setJdUrl(e.target.value)}
+                                        />
+                                    </div>
+                                </div>
+                            </div>
+                        ) : (
+                            <div className="card-elevated rounded-2xl p-6 sm:p-8">
+                                <h2 className="text-lg font-semibold mb-2">Verify the role &amp; company</h2>
+                                <p className="text-muted-foreground text-sm mb-6">
+                                    We pulled these from the posting. Fix anything the parser got wrong — they label this analysis across your dashboard and company intelligence.
+                                </p>
+
+                                <div className="space-y-4">
                                         <div className="bg-surface-2 rounded-xl p-4 border border-border/50 space-y-4">
                                             <div className="flex items-center justify-between">
                                                 <p className="text-sm font-semibold text-success">Parsed — please verify</p>
@@ -366,8 +417,8 @@ export default function UploadPage() {
                                             </div>
                                         </div>
                                     </div>
-                                )}
-                            </div>
+                                </div>
+                            )
                         )}
 
                         {/* ---------------------------------------------- step 3 */}
@@ -669,7 +720,6 @@ export default function UploadPage() {
                         <p className="text-sm text-error">{error}</p>
                     </div>
                 )}
-            </div>
         </div>
     );
 }

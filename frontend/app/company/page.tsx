@@ -64,7 +64,7 @@ export default function CompanyIndexPage() {
     }
 
     return (
-        <motion.div initial={{ opacity: 0 }} animate={{ opacity: 1 }} className="max-w-6xl mx-auto space-y-6">
+        <motion.div initial={{ opacity: 0 }} animate={{ opacity: 1 }} className="max-w-7xl mx-auto space-y-6">
             <div>
                 <h1 className="text-2xl font-bold text-foreground">Company Intelligence</h1>
                 <p className="text-sm text-muted mt-1">

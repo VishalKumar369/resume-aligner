@@ -2,13 +2,20 @@
 
 import { motion } from "framer-motion";
 import Link from "next/link";
-import { AlertCircle, BarChart3, Layers, BookOpen } from "lucide-react";
+import { AlertCircle, BarChart3, Layers, BookOpen, Target } from "lucide-react";
 import { StatCard } from "@/components/ui/StatCard";
 import { SkillHeatmap, HeatmapSkill } from "@/components/dashboard/SkillHeatmap";
 import { EmptyState, ErrorState, PriorityBadge, Skeleton, StatSkeletonRow } from "@/components/ui/States";
 import { useApi } from "@/hooks/useApi";
 import { dashboardService } from "@/services/api";
-import { learningLinkForSkill } from "@/lib/utils";
+import { learningLinkForSkill, noteComposeLink } from "@/lib/utils";
+
+// Colour a goal note by how critical the gap is.
+const goalColor = (priority?: string) =>
+    priority === "P1" ? "error" : priority === "P2" ? "warning" : "primary";
+
+const goalLink = (skill: string, priority?: string) =>
+    noteComposeLink({ title: `Learn ${skill}`, category: "Goal", color: goalColor(priority) });
 
 export default function SkillsPage() {
     const { data, loading, error, reload } = useApi<any>(() => dashboardService.getSummary());
@@ -57,7 +64,7 @@ export default function SkillsPage() {
     ];
 
     return (
-        <div className="max-w-6xl mx-auto space-y-6">
+        <div className="max-w-7xl mx-auto space-y-6">
             <div>
                 <h1 className="text-2xl font-bold">Skill Gap Analysis</h1>
                 <p className="text-sm text-muted mt-1">
@@ -94,6 +101,7 @@ export default function SkillsPage() {
                                 <th className="text-left p-4 font-medium">Category</th>
                                 <th className="text-left p-4 font-medium">Roles requiring it</th>
                                 <th className="text-left p-4 font-medium">Type</th>
+                                <th className="p-4 font-medium" />
                             </tr>
                         </thead>
                         <tbody>
@@ -113,6 +121,15 @@ export default function SkillsPage() {
                                     <td className="p-4 text-muted capitalize">{(gap.category || "—").replace(/-/g, " ")}</td>
                                     <td className="p-4 text-muted">{gap.jd_count}</td>
                                     <td className="p-4 text-muted">{gap.mandatory ? "Required" : "Nice to have"}</td>
+                                    <td className="p-4 text-right">
+                                        <Link
+                                            href={goalLink(gap.skill, gap.priority)}
+                                            title={`Add ${gap.skill} as a personal goal`}
+                                            className="inline-flex items-center gap-1 text-xs text-primary hover:underline whitespace-nowrap"
+                                        >
+                                            <Target className="w-3.5 h-3.5" /> Add goal
+                                        </Link>
+                                    </td>
                                 </tr>
                             ))}
                         </tbody>
@@ -128,12 +145,21 @@ export default function SkillsPage() {
                     </p>
                     <div className="space-y-2">
                         {partial.map((item) => (
-                            <div key={item.skill} className="text-xs text-muted border-l-2 border-warning/40 pl-3 py-1">
-                                <Link href={learningLinkForSkill(item.skill)} className="text-warning font-medium hover:underline">
-                                    {item.skill}
+                            <div key={item.skill} className="flex items-center justify-between gap-3 text-xs text-muted border-l-2 border-warning/40 pl-3 py-1">
+                                <div className="min-w-0">
+                                    <Link href={learningLinkForSkill(item.skill)} className="text-warning font-medium hover:underline">
+                                        {item.skill}
+                                    </Link>
+                                    {" "}— you have {item.covered_by}
+                                    {item.jd_count > 1 && ` · asked for by ${item.jd_count} roles`}
+                                </div>
+                                <Link
+                                    href={noteComposeLink({ title: `Strengthen ${item.skill}`, category: "Goal", color: "warning" })}
+                                    title={`Add ${item.skill} as a personal goal`}
+                                    className="inline-flex items-center gap-1 text-primary hover:underline whitespace-nowrap flex-shrink-0"
+                                >
+                                    <Target className="w-3 h-3" /> Add goal
                                 </Link>
-                                {" "}— you have {item.covered_by}
-                                {item.jd_count > 1 && ` · asked for by ${item.jd_count} roles`}
                             </div>
                         ))}
                     </div>
