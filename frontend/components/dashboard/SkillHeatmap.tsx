@@ -41,7 +41,7 @@ export function SkillHeatmap({
             initial={{ opacity: 0, y: 16 }}
             animate={{ opacity: 1, y: 0 }}
             transition={{ duration: 0.4, delay: 0.1 }}
-            className="card-elevated rounded-2xl p-6"
+            className="card-elevated rounded-2xl p-5"
         >
             <div className="flex items-center justify-between mb-4 gap-4 flex-wrap">
                 <div>

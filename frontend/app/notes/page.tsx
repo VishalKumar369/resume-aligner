@@ -176,7 +176,7 @@ function NotesContent() {
             {/* Header */}
             <div className="flex items-start justify-between gap-4 flex-wrap">
                 <div>
-                    <h1 className="text-2xl font-bold inline-flex items-center gap-2">
+                    <h1 className="text-xl font-semibold tracking-tight inline-flex items-center gap-2">
                         <NotebookPen className="w-6 h-6 text-primary" /> Notes
                     </h1>
                     <p className="text-sm text-muted mt-1">

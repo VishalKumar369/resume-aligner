@@ -64,8 +64,8 @@ export default function ResumeVersionsPage() {
     return (
         <div className="max-w-5xl mx-auto space-y-6">
             <div>
-                <h1 className="text-2xl font-bold">Resume Versions</h1>
-                <p className="text-sm text-muted mt-1">
+                <h1 className="text-xl font-semibold tracking-tight">Resume Versions</h1>
+                <p className="text-[13px] text-muted mt-1">
                     Tailored variants of {resumes?.[0]?.label || resumes?.[0]?.filename}
                 </p>
             </div>
