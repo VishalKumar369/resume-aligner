@@ -99,7 +99,7 @@ export default function DashboardPage() {
     const analyzedOn = active?.created_at ? new Date(active.created_at).toLocaleDateString() : null;
 
     return (
-        <motion.div initial={{ opacity: 0 }} animate={{ opacity: 1 }} className="space-y-6 max-w-7xl mx-auto">
+        <motion.div initial={{ opacity: 0 }} animate={{ opacity: 1 }} className="space-y-6 max-w-8xl mx-auto">
             <div>
                 <h1 className="text-2xl font-bold text-foreground">Career Intelligence Dashboard</h1>
                 <p className="text-sm text-muted mt-1">
@@ -142,13 +142,13 @@ export default function DashboardPage() {
 
             {/* Row 1: ATS breakdown + recommendations (equal height, each scrolls). */}
             <div className="grid lg:grid-cols-2 gap-6">
-                <AtsBreakdownPanel axes={radarAxes} analyses={analyses} className="lg:h-[460px]" />
+                <AtsBreakdownPanel axes={radarAxes} analyses={analyses} className="lg:h-[388px]" />
 
                 <motion.div
                     initial={{ opacity: 0, y: 16 }}
                     animate={{ opacity: 1, y: 0 }}
                     transition={{ delay: 0.25 }}
-                    className="card-elevated rounded-2xl p-6 flex flex-col lg:h-[460px]"
+                    className="card-elevated rounded-2xl p-6 flex flex-col lg:h-[388px]"
                 >
                     <h3 className="text-sm font-semibold text-foreground mb-4 flex-shrink-0">Recommended Improvements</h3>
                     {detailLoading ? (
@@ -180,8 +180,8 @@ export default function DashboardPage() {
 
             {/* Row 2: readiness radar + skill heatmap (equal height). */}
             <div className="grid lg:grid-cols-2 gap-6">
-                <CareerRadarChart axes={radarAxes} title="Readiness radar" className="lg:h-[460px]" />
-                <SkillHeatmap skills={heatmap} className="lg:h-[460px]" />
+                <CareerRadarChart axes={radarAxes} title="Readiness radar" className="lg:h-[388px]" />
+                <SkillHeatmap skills={heatmap} className="lg:h-[388px]" />
             </div>
 
             <AnalysisTrackerTable analyses={analyses} activeId={activeId} onSelect={setSelectedId} onDelete={handleDelete} />

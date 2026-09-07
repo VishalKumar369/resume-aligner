@@ -190,7 +190,7 @@ export default function UploadPage() {
         (currentStep === 2 && !jd && !jdText.trim());
 
     return (
-        <div className="max-w-7xl mx-auto p-4 sm:p-6">
+        <div className="max-w-8xl mx-auto p-4 sm:p-6">
             <div className="mb-6">
                 <h1 className="text-2xl font-bold">New analysis</h1>
                 <p className="text-sm text-muted mt-1">
