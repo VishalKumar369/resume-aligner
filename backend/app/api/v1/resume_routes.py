@@ -20,7 +20,8 @@ from app.repositories.version_repo import ResumeVersionRepository
 from app.schemas.resume import ResumeOptimizeRequest, ResumeOut
 from app.schemas.version import OptimizeResponse, ResumeVersionOut
 from app.services.documents.writers import render_docx, render_pdf
-from app.services.documents.docx_editor import apply_rewrites_to_docx, docx_to_pdf
+from app.services.documents.docx_editor import docx_to_pdf, optimize_docx_in_place
+from app.services.documents.keyword_highlight import compile_keyword_pattern, jd_keywords
 from app.services.extraction.types import FileType
 from app.services.optimization.engine import OptimizationEngine
 from app.services.parsing.resume_parser import ResumeParserService
@@ -169,7 +170,7 @@ async def optimize_resume(
     stem = _version_stem(resume.filename, version_number)
 
     storage = get_storage()
-    docx_bytes, pdf_bytes, preserved = await _build_optimized_documents(resume, result, storage)
+    docx_bytes, pdf_bytes, preserved = await _build_optimized_documents(resume, result, jd_data, storage)
     if preserved:
         # In-place editing keeps the user's layout, so only the bullet rewrites
         # (and any blocked ones) are actually reflected — reordering, condensing,
@@ -234,15 +235,18 @@ async def optimize_resume(
     )
 
 
-async def _build_optimized_documents(resume, result, storage):
+async def _build_optimized_documents(resume, result, jd_data, storage):
     """The .docx/.pdf to deliver for an optimized resume.
 
     When the upload was a .docx, edit that file in place so the user's own
     formatting (colours, fonts, hyperlinks, layout) is preserved and only the
     rewritten bullet wording changes; the PDF is that same document converted by
     LibreOffice. For PDF uploads, or on any failure, fall back to the ATS
-    template renderer. Returns (docx_bytes, pdf_bytes, format_preserved).
+    template renderer. Either way the JD's keywords are bolded in the bullets.
+    Returns (docx_bytes, pdf_bytes, format_preserved).
     """
+    keyword_pattern = compile_keyword_pattern(jd_keywords(jd_data))
+
     original_is_docx = (resume.filename or "").lower().endswith(".docx")
     if original_is_docx and resume.s3_path:
         try:
@@ -252,18 +256,22 @@ async def _build_optimized_documents(resume, result, storage):
                 for change in result.changes
                 if change.get("before") and change.get("after")
             ]
-            edited, applied = apply_rewrites_to_docx(original, rewrites)
+            edited, applied, _highlighted = optimize_docx_in_place(original, rewrites, keyword_pattern)
             # Use the preserved file when the rewrites landed, or when there
             # were none to apply (nothing to change — keep the design as-is).
             if applied or not rewrites:
-                pdf = docx_to_pdf(edited) or render_pdf(result.optimized_data)
+                pdf = docx_to_pdf(edited) or render_pdf(result.optimized_data, keyword_pattern)
                 return edited, pdf, True
         except Exception:  # noqa: BLE001 - a format edit must never fail optimize
             logger.warning(
                 "In-place .docx optimization failed; using the template renderer.",
                 exc_info=True,
             )
-    return render_docx(result.optimized_data), render_pdf(result.optimized_data), False
+    return (
+        render_docx(result.optimized_data, keyword_pattern),
+        render_pdf(result.optimized_data, keyword_pattern),
+        False,
+    )
 
 
 @router.get("/versions/{version_id}/download")

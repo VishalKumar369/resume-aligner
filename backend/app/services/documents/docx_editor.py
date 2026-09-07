@@ -10,13 +10,17 @@ A matching PDF is produced by converting the edited .docx with LibreOffice when
 it is installed; callers fall back to the template renderer when it is not.
 """
 
+import copy
 import os
 import re
 import shutil
 import subprocess
 import tempfile
 from io import BytesIO
-from typing import List, Optional, Tuple
+from typing import List, Optional, Pattern, Tuple
+
+from app.services.documents.keyword_highlight import segment_text
+from app.services.parsing.line_utils import is_bullet
 
 
 def _norm(text: str) -> str:
@@ -24,32 +28,57 @@ def _norm(text: str) -> str:
     return re.sub(r"\s+", " ", (text or "").strip()).lower()
 
 
-def apply_rewrites_to_docx(
-    original: bytes, rewrites: List[Tuple[str, str]]
-) -> Tuple[bytes, int]:
-    """Return (edited_docx_bytes, replacements_applied).
+def optimize_docx_in_place(
+    original: bytes,
+    rewrites: List[Tuple[str, str]],
+    keyword_pattern: Optional[Pattern] = None,
+) -> Tuple[bytes, int, int]:
+    """Apply the bullet rewrites and highlight the JD keywords in one pass.
 
-    Each (before, after) rewrite replaces the text of the paragraph whose text
-    matches ``before``, keeping that paragraph's own run formatting and style.
-    Only matched paragraphs change; hyperlinks and styling elsewhere are left
-    untouched. ``replacements_applied`` is 0 when nothing matched, letting the
-    caller fall back to the template renderer.
+    Returns (edited_docx_bytes, replacements_applied, keywords_highlighted). The
+    document is loaded once; rewrites run first (so a rewritten bullet's new
+    wording is what gets highlighted).
     """
     import docx  # imported lazily; python-docx is a heavy import
 
     document = docx.Document(BytesIO(original))
-    wanted = {_norm(before): after for before, after in rewrites if before and after}
-    applied = 0
-
-    if wanted:
-        for paragraph in _iter_paragraphs(document):
-            replacement = wanted.get(_norm(paragraph.text))
-            if replacement is not None and _replace_paragraph_text(paragraph, replacement):
-                applied += 1
+    applied = _apply_rewrites(document, rewrites)
+    highlighted = highlight_bullets_in_docx(document, keyword_pattern)
 
     buffer = BytesIO()
     document.save(buffer)
+    return buffer.getvalue(), applied, highlighted
+
+
+def apply_rewrites_to_docx(
+    original: bytes, rewrites: List[Tuple[str, str]]
+) -> Tuple[bytes, int]:
+    """Return (edited_docx_bytes, replacements_applied) — rewrites only."""
+    import docx
+
+    document = docx.Document(BytesIO(original))
+    applied = _apply_rewrites(document, rewrites)
+    buffer = BytesIO()
+    document.save(buffer)
     return buffer.getvalue(), applied
+
+
+def _apply_rewrites(document, rewrites: List[Tuple[str, str]]) -> int:
+    """Replace each paragraph whose text matches a rewrite's ``before``.
+
+    Only matched paragraphs change; hyperlinks and styling elsewhere are left
+    untouched. Returns how many replacements landed, so the caller can fall back
+    to the template renderer when nothing matched.
+    """
+    wanted = {_norm(before): after for before, after in rewrites if before and after}
+    if not wanted:
+        return 0
+    applied = 0
+    for paragraph in _iter_paragraphs(document):
+        replacement = wanted.get(_norm(paragraph.text))
+        if replacement is not None and _replace_paragraph_text(paragraph, replacement):
+            applied += 1
+    return applied
 
 
 def _iter_paragraphs(document):
@@ -76,6 +105,70 @@ def _replace_paragraph_text(paragraph, new_text: str) -> bool:
     for run in runs[1:]:
         run.text = ""
     return True
+
+
+def highlight_bullets_in_docx(document, pattern: Optional[Pattern]) -> int:
+    """Bold every JD keyword occurrence inside the resume's bullet paragraphs.
+
+    Scoped to bullets (list-styled or glyph-prefixed) so headings, the name, and
+    the contact line are never touched. Returns the number of keywords bolded.
+    """
+    if pattern is None:
+        return 0
+    highlighted = 0
+    for paragraph in _iter_paragraphs(document):
+        if _is_body_bullet(paragraph):
+            highlighted += _highlight_paragraph(paragraph, pattern)
+    return highlighted
+
+
+def _is_body_bullet(paragraph) -> bool:
+    style_name = (paragraph.style.name or "") if paragraph.style is not None else ""
+    return style_name.startswith("List") or is_bullet(paragraph.text)
+
+
+def _highlight_paragraph(paragraph, pattern: Pattern) -> int:
+    # Snapshot the runs: highlighting a run inserts new sibling runs after it,
+    # which must not be re-processed.
+    count = 0
+    for run in list(paragraph.runs):
+        count += _highlight_run(run, pattern)
+    return count
+
+
+def _highlight_run(run, pattern: Pattern) -> int:
+    """Split one run so keyword matches become their own bold runs.
+
+    The run's own formatting (font, size, colour, italic) is copied to every
+    piece; only the weight of the keyword pieces changes. Returns how many
+    keyword pieces were emphasised.
+    """
+    segments = segment_text(run.text, pattern)
+    if not any(is_keyword for _, is_keyword in segments):
+        return 0
+
+    from docx.text.run import Run
+
+    # Capture the original run's formatting before we mutate it, so every new
+    # piece inherits the same look and only its bold flag varies.
+    template = copy.deepcopy(run._element)
+    base_bold = run.bold
+
+    run.text = segments[0][0]
+    run.bold = True if segments[0][1] else base_bold
+    count = 1 if segments[0][1] else 0
+
+    anchor = run._element
+    for seg_text, is_keyword in segments[1:]:
+        element = copy.deepcopy(template)
+        anchor.addnext(element)
+        anchor = element
+        piece = Run(element, run._parent)
+        piece.text = seg_text
+        piece.bold = True if is_keyword else base_bold
+        if is_keyword:
+            count += 1
+    return count
 
 
 def docx_to_pdf(docx_bytes: bytes, timeout: float = 60.0) -> Optional[bytes]:

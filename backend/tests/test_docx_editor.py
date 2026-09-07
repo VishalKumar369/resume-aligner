@@ -5,7 +5,11 @@ from io import BytesIO
 import docx
 from docx.shared import RGBColor
 
-from app.services.documents.docx_editor import apply_rewrites_to_docx
+from app.services.documents.docx_editor import (
+    apply_rewrites_to_docx,
+    optimize_docx_in_place,
+)
+from app.services.documents.keyword_highlight import compile_keyword_pattern
 
 
 def _resume() -> bytes:
@@ -70,3 +74,32 @@ class TestApplyRewritesToDocx:
             "Built APIs in Python",
             "Led a team of five engineers",
         ]
+
+
+class TestOptimizeDocxInPlace:
+    def test_bolds_jd_keywords_in_bullets_only(self):
+        pattern = compile_keyword_pattern(["Python", "APIs"])
+        edited, applied, highlighted = optimize_docx_in_place(_resume(), [], pattern)
+
+        assert applied == 0
+        assert highlighted == 2  # "APIs" and "Python" in the bullet
+        paras = _paragraphs(edited)
+        # The name is left alone — not split into keyword runs.
+        assert paras[0].text == "Vishal Kumar"
+        assert len(paras[0].runs) == 1
+        bolded = [r.text for r in paras[1].runs if r.bold]
+        assert "Python" in bolded and "APIs" in bolded
+
+    def test_highlights_the_rewritten_wording(self):
+        # A rewrite runs first, so its new text is what gets highlighted.
+        pattern = compile_keyword_pattern(["Kafka"])
+        edited, applied, highlighted = optimize_docx_in_place(
+            _resume(),
+            [("Built APIs in Python", "Streamed events with Kafka at scale")],
+            pattern,
+        )
+        assert applied == 1
+        assert highlighted == 1
+        bullet = _paragraphs(edited)[1]
+        assert bullet.text == "Streamed events with Kafka at scale"
+        assert [r.text for r in bullet.runs if r.bold] == ["Kafka"]

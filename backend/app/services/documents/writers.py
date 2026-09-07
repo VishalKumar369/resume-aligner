@@ -12,8 +12,9 @@ single-page condenser measure the PDF once and trust that the .docx fits too.
 
 from dataclasses import dataclass
 from io import BytesIO
-from typing import Any, Dict, List, Optional, Tuple
+from typing import Any, Dict, List, Optional, Pattern, Tuple
 
+from app.services.documents.keyword_highlight import segment_text
 from app.services.documents.layout import BlockKind, build_blocks
 
 # --------------------------------------------------------------- shared layout
@@ -81,7 +82,7 @@ def render_text(resume_data: Dict[str, Any]) -> str:
 # ------------------------------------------------------------------------- docx
 
 
-def render_docx(resume_data: Dict[str, Any]) -> bytes:
+def render_docx(resume_data: Dict[str, Any], highlight_pattern: Optional[Pattern] = None) -> bytes:
     import docx
     from docx.enum.text import WD_ALIGN_PARAGRAPH, WD_LINE_SPACING
     from docx.shared import Pt, RGBColor
@@ -137,6 +138,12 @@ def render_docx(resume_data: Dict[str, Any]) -> bytes:
         if spec.center:
             paragraph.alignment = WD_ALIGN_PARAGRAPH.CENTER
 
+    # Bold the JD's keywords inside bullets, reusing the in-place highlighter so
+    # the template and the preserved-file paths emphasise identically.
+    if highlight_pattern is not None:
+        from app.services.documents.docx_editor import highlight_bullets_in_docx
+        highlight_bullets_in_docx(document, highlight_pattern)
+
     buffer = BytesIO()
     document.save(buffer)
     return buffer.getvalue()
@@ -145,13 +152,15 @@ def render_docx(resume_data: Dict[str, Any]) -> bytes:
 # -------------------------------------------------------------------------- pdf
 
 
-def render_pdf(resume_data: Dict[str, Any]) -> bytes:
-    payload, _pages = render_pdf_with_page_count(resume_data)
+def render_pdf(resume_data: Dict[str, Any], highlight_pattern: Optional[Pattern] = None) -> bytes:
+    payload, _pages = render_pdf_with_page_count(resume_data, highlight_pattern=highlight_pattern)
     return payload
 
 
 def render_pdf_with_page_count(
-    resume_data: Dict[str, Any], measure_headroom: float = 0.0
+    resume_data: Dict[str, Any],
+    measure_headroom: float = 0.0,
+    highlight_pattern: Optional[Pattern] = None,
 ) -> Tuple[bytes, int]:
     """Render the PDF and report how many pages it occupies.
 
@@ -201,7 +210,8 @@ def render_pdf_with_page_count(
 
     for block in build_blocks(resume_data):
         if block.kind is BlockKind.BULLET:
-            bullets.append(ListItem(Paragraph(_escape(block.text), styles[BlockKind.BULLET]), leftIndent=12))
+            markup = _highlight_markup(block.text, highlight_pattern)
+            bullets.append(ListItem(Paragraph(markup, styles[BlockKind.BULLET]), leftIndent=12))
             continue
 
         flush_bullets()
@@ -230,4 +240,14 @@ def _escape(text: str) -> str:
         .replace("&", "&amp;")
         .replace("<", "&lt;")
         .replace(">", "&gt;")
+    )
+
+
+def _highlight_markup(text: str, pattern: Optional[Pattern]) -> str:
+    """Escaped reportlab markup with the JD's keyword matches wrapped in <b>."""
+    if pattern is None:
+        return _escape(text)
+    return "".join(
+        f"<b>{_escape(chunk)}</b>" if is_keyword else _escape(chunk)
+        for chunk, is_keyword in segment_text(text, pattern)
     )
