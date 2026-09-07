@@ -250,3 +250,22 @@ class TestAgainstRealRender:
         # Every work role survives with at least one bullet.
         assert all(len(e["highlights"]) >= 1 for e in data["experience"])
         assert len(data["experience"]) == 4
+
+
+class TestKeepsAchievements:
+    """Achievements are a differentiator, so they survive until other levers are spent."""
+
+    def test_trims_bullets_to_the_floor_before_dropping_an_achievement(self):
+        # The page stub fits only at one bullet; trimming there is enough, so the
+        # non-JD achievement must still be present (it is dropped later than
+        # aggressive bullet trimming).
+        data = resume(["b1", "b2", "b3", "b4", "b5"])
+        data["achievements"] = ["Won a national hackathon."]
+
+        condenser = SinglePageCondenser(min_bullets_per_role=2, page_counter=_PageStub(keep=1))
+        result = condenser.condense(data, jd())
+
+        assert result.fits is True
+        assert result.dropped_achievements == 0
+        assert data["achievements"] == ["Won a national hackathon."]
+        assert len(bullets_of(data)) == 1
