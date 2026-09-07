@@ -203,17 +203,26 @@ describe("resumeService", () => {
             jd_id: "j-1",
             focus_area: null,
             page_preference: "single",
+            layout: null,
+            sections: null,
         });
     });
 
-    it("passes the chosen page preference and focus area", () => {
-        resumeService.optimize("r-1", "j-1", { pagePreference: "multi", focusArea: "backend" });
+    it("passes the chosen page preference, focus area, layout and sections", () => {
+        resumeService.optimize("r-1", "j-1", {
+            pagePreference: "multi",
+            focusArea: "backend",
+            layout: "modern",
+            sections: ["experience", "skills"],
+        });
 
         expect(axiosInstance.post).toHaveBeenCalledWith("/resume/optimize", {
             resume_id: "r-1",
             jd_id: "j-1",
             focus_area: "backend",
             page_preference: "multi",
+            layout: "modern",
+            sections: ["experience", "skills"],
         });
     });
 

@@ -94,13 +94,22 @@ export const resumeService = {
     optimize: (
         resumeId: string,
         jdId: string,
-        options: { focusArea?: string; pagePreference?: "single" | "multi" } = {}
+        options: {
+            focusArea?: string;
+            pagePreference?: "single" | "multi";
+            // "original" keeps the uploaded .docx; a template id rebuilds it.
+            layout?: string;
+            // Body sections to include, in order. Only applied when rebuilding.
+            sections?: string[];
+        } = {}
     ) =>
         api.post("/resume/optimize", {
             resume_id: resumeId,
             jd_id: jdId,
             focus_area: options.focusArea || null,
             page_preference: options.pagePreference || "single",
+            layout: options.layout || null,
+            sections: options.sections || null,
         }),
     getVersions: (resumeId: string) => api.get(`/resume/${resumeId}/versions`),
     downloadUrl: (versionId: string, format: "docx" | "pdf") =>

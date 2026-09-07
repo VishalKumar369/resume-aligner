@@ -19,7 +19,7 @@ from app.repositories.resume_repo import ResumeRepository
 from app.repositories.version_repo import ResumeVersionRepository
 from app.schemas.resume import ResumeOptimizeRequest, ResumeOut
 from app.schemas.version import OptimizeResponse, ResumeVersionOut
-from app.services.documents.writers import render_docx, render_pdf
+from app.services.documents.writers import LAYOUT_IDS, render_docx, render_pdf
 from app.services.documents.docx_editor import docx_to_pdf, optimize_docx_in_place
 from app.services.documents.keyword_highlight import compile_keyword_pattern, jd_keywords
 from app.services.extraction.types import FileType
@@ -156,12 +156,22 @@ async def optimize_resume(
             detail="This resume has no readable experience or skills to optimize.",
         )
 
+    # Layout & sections. "original" (the default for a .docx upload) keeps the
+    # user's own file; any template layout — or a PDF upload — rebuilds it, and
+    # only then does the section reorder/exclude apply.
+    original_is_docx = (resume.filename or "").lower().endswith(".docx")
+    requested_layout = (payload.layout or "").strip().lower()
+    use_original = requested_layout in ("", "original") and original_is_docx
+    template_layout = requested_layout if requested_layout in LAYOUT_IDS else "classic"
+    section_order = None if use_original else (payload.sections or None)
+
     result = await OptimizationEngine(db=db).optimize(
         resume_data,
         jd_data,
         resume_text=resume.raw_text or "",
         extraction_meta=resume.extraction_meta,
         single_page=payload.page_preference == "single",
+        section_order=section_order,
     )
 
     repo = ResumeVersionRepository(ResumeVersion, db)
@@ -170,7 +180,10 @@ async def optimize_resume(
     stem = _version_stem(resume.filename, version_number)
 
     storage = get_storage()
-    docx_bytes, pdf_bytes, preserved = await _build_optimized_documents(resume, result, jd_data, storage)
+    docx_bytes, pdf_bytes, preserved = await _build_optimized_documents(
+        resume, result, jd_data, storage,
+        use_original=use_original, layout=template_layout, section_order=section_order,
+    )
     if preserved:
         # In-place editing keeps the user's layout, so only the bullet rewrites
         # (and any blocked ones) are actually reflected — reordering, condensing,
@@ -235,20 +248,21 @@ async def optimize_resume(
     )
 
 
-async def _build_optimized_documents(resume, result, jd_data, storage):
+async def _build_optimized_documents(
+    resume, result, jd_data, storage, *, use_original, layout, section_order
+):
     """The .docx/.pdf to deliver for an optimized resume.
 
-    When the upload was a .docx, edit that file in place so the user's own
+    With "original" on a .docx upload, edit that file in place so the user's own
     formatting (colours, fonts, hyperlinks, layout) is preserved and only the
     rewritten bullet wording changes; the PDF is that same document converted by
-    LibreOffice. For PDF uploads, or on any failure, fall back to the ATS
-    template renderer. Either way the JD's keywords are bolded in the bullets.
+    LibreOffice. Otherwise rebuild with the chosen template ``layout`` and
+    ``section_order``. Either way the JD's keywords are bolded in the bullets.
     Returns (docx_bytes, pdf_bytes, format_preserved).
     """
     keyword_pattern = compile_keyword_pattern(jd_keywords(jd_data))
 
-    original_is_docx = (resume.filename or "").lower().endswith(".docx")
-    if original_is_docx and resume.s3_path:
+    if use_original and resume.s3_path:
         try:
             original = await storage.get_file_content(resume.s3_path)
             rewrites = [
@@ -260,7 +274,9 @@ async def _build_optimized_documents(resume, result, jd_data, storage):
             # Use the preserved file when the rewrites landed, or when there
             # were none to apply (nothing to change — keep the design as-is).
             if applied or not rewrites:
-                pdf = docx_to_pdf(edited) or render_pdf(result.optimized_data, keyword_pattern)
+                pdf = docx_to_pdf(edited) or render_pdf(
+                    result.optimized_data, keyword_pattern, "classic", section_order
+                )
                 return edited, pdf, True
         except Exception:  # noqa: BLE001 - a format edit must never fail optimize
             logger.warning(
@@ -268,8 +284,8 @@ async def _build_optimized_documents(resume, result, jd_data, storage):
                 exc_info=True,
             )
     return (
-        render_docx(result.optimized_data, keyword_pattern),
-        render_pdf(result.optimized_data, keyword_pattern),
+        render_docx(result.optimized_data, keyword_pattern, layout, section_order),
+        render_pdf(result.optimized_data, keyword_pattern, layout, section_order),
         False,
     )
 
