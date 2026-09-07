@@ -1,4 +1,5 @@
 import hashlib
+import logging
 import os
 import re
 import uuid
@@ -19,12 +20,15 @@ from app.repositories.version_repo import ResumeVersionRepository
 from app.schemas.resume import ResumeOptimizeRequest, ResumeOut
 from app.schemas.version import OptimizeResponse, ResumeVersionOut
 from app.services.documents.writers import render_docx, render_pdf
+from app.services.documents.docx_editor import apply_rewrites_to_docx, docx_to_pdf
 from app.services.extraction.types import FileType
 from app.services.optimization.engine import OptimizationEngine
 from app.services.parsing.resume_parser import ResumeParserService
 from app.services.storage.storage_adapter import get_storage
 
 router = APIRouter()
+
+logger = logging.getLogger(__name__)
 
 MAX_UPLOAD_BYTES = 5 * 1024 * 1024  # matches the 5MB limit advertised in the UI
 SUPPORTED_TYPES = {FileType.PDF, FileType.DOCX, FileType.TXT}
@@ -165,8 +169,25 @@ async def optimize_resume(
     stem = _version_stem(resume.filename, version_number)
 
     storage = get_storage()
-    docx_path = await storage.upload_file(BytesIO(render_docx(result.optimized_data)), f"{stem}.docx")
-    pdf_path = await storage.upload_file(BytesIO(render_pdf(result.optimized_data)), f"{stem}.pdf")
+    docx_bytes, pdf_bytes, preserved = await _build_optimized_documents(resume, result, storage)
+    if preserved:
+        # In-place editing keeps the user's layout, so only the bullet rewrites
+        # (and any blocked ones) are actually reflected — reordering, condensing,
+        # and skill promotion are structural changes we deliberately don't make
+        # to their design. Report only what the delivered file really contains.
+        reflected = [
+            change for change in result.changes
+            if change.get("type") in ("bullet_rewritten", "rewrites_blocked")
+        ]
+        result.changes = [{
+            "type": "format_preserved",
+            "description": (
+                "Kept your original resume's formatting — fonts, colours, "
+                "links, and layout — and optimized only the wording."
+            ),
+        }] + reflected
+    docx_path = await storage.upload_file(BytesIO(docx_bytes), f"{stem}.docx")
+    pdf_path = await storage.upload_file(BytesIO(pdf_bytes), f"{stem}.pdf")
 
     version = await repo.create(obj_in={
         "resume_id": payload.resume_id,
@@ -211,6 +232,38 @@ async def optimize_resume(
         download_docx=f"/api/v1/resume/versions/{version.id}/download?format=docx",
         download_pdf=f"/api/v1/resume/versions/{version.id}/download?format=pdf",
     )
+
+
+async def _build_optimized_documents(resume, result, storage):
+    """The .docx/.pdf to deliver for an optimized resume.
+
+    When the upload was a .docx, edit that file in place so the user's own
+    formatting (colours, fonts, hyperlinks, layout) is preserved and only the
+    rewritten bullet wording changes; the PDF is that same document converted by
+    LibreOffice. For PDF uploads, or on any failure, fall back to the ATS
+    template renderer. Returns (docx_bytes, pdf_bytes, format_preserved).
+    """
+    original_is_docx = (resume.filename or "").lower().endswith(".docx")
+    if original_is_docx and resume.s3_path:
+        try:
+            original = await storage.get_file_content(resume.s3_path)
+            rewrites = [
+                (change["before"], change["after"])
+                for change in result.changes
+                if change.get("before") and change.get("after")
+            ]
+            edited, applied = apply_rewrites_to_docx(original, rewrites)
+            # Use the preserved file when the rewrites landed, or when there
+            # were none to apply (nothing to change — keep the design as-is).
+            if applied or not rewrites:
+                pdf = docx_to_pdf(edited) or render_pdf(result.optimized_data)
+                return edited, pdf, True
+        except Exception:  # noqa: BLE001 - a format edit must never fail optimize
+            logger.warning(
+                "In-place .docx optimization failed; using the template renderer.",
+                exc_info=True,
+            )
+    return render_docx(result.optimized_data), render_pdf(result.optimized_data), False
 
 
 @router.get("/versions/{version_id}/download")
