@@ -9,3 +9,4 @@ from app.models.analytics import SkillGap, LearningPath, DashboardSnapshot # noq
 from app.models.llm_cache import LLMCacheEntry # noqa
 from app.models.note import Note # noqa
 from app.models.feedback import Feedback # noqa
+from app.models.email_verification import EmailVerificationCode # noqa

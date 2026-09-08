@@ -5,7 +5,7 @@ import { motion } from "framer-motion";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { FileText, Eye, EyeOff, ArrowRight, Check } from "lucide-react";
-import { authService, userService } from "@/services/api";
+import { authService, userService, EMAIL_VERIFICATION_ENABLED } from "@/services/api";
 import { useAuthStore } from "@/store/authStore";
 
 const PLATFORM_NAME = process.env.NEXT_PUBLIC_PLATFORM_NAME || "Resume JD Aligner";
@@ -45,6 +45,13 @@ export default function SignupPage() {
                 password,
                 full_name: cleanFullName
             });
+
+            // When email verification is on, the account starts unverified and
+            // can't log in yet — send them to enter the code we just emailed.
+            if (EMAIL_VERIFICATION_ENABLED) {
+                router.push(`/auth/verify?email=${encodeURIComponent(cleanEmail)}`);
+                return;
+            }
 
             // Sign the new user straight in so they land on the dashboard instead
             // of retyping credentials; hydrate the real profile from /me.

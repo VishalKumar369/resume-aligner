@@ -53,7 +53,17 @@ export const authService = {
             headers: { "Content-Type": "application/x-www-form-urlencoded" },
         });
     },
+    // Signup email verification (only used when the feature flag is on).
+    verifyEmail: (data: { email: string; code: string }) =>
+        api.post("/auth/verify-email", { email: normalizeEmail(data.email), code: data.code }),
+    resendVerification: (email: string) =>
+        api.post("/auth/resend-verification", { email: normalizeEmail(email) }),
 };
+
+// A single switch for the UI, kept in step with the backend's
+// EMAIL_VERIFICATION_ENABLED. Set NEXT_PUBLIC_EMAIL_VERIFICATION_ENABLED=true.
+export const EMAIL_VERIFICATION_ENABLED =
+    process.env.NEXT_PUBLIC_EMAIL_VERIFICATION_ENABLED === "true";
 
 // ------------------------------------------------------------------ account
 

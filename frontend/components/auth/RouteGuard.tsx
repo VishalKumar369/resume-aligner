@@ -19,7 +19,7 @@ export function RouteGuard({ children }: { children: React.ReactNode }) {
         if (!mounted) return;
 
         // Paths that do not require authentication
-        const publicPaths = ["/", "/auth/login", "/auth/signup"];
+        const publicPaths = ["/", "/auth/login", "/auth/signup", "/auth/verify"];
         const path = pathname.split("?")[0];
         const isPublicPath = publicPaths.includes(path);
 
