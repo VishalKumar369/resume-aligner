@@ -8,6 +8,7 @@ no columns, no graphics. That is exactly what the `structural_safety` component
 of the ATS score rewards, and what breaks resume parsers when absent.
 """
 
+import re
 from dataclasses import dataclass
 from enum import Enum
 from typing import Any, Callable, Dict, List, Optional, Sequence
@@ -28,7 +29,10 @@ class BlockKind(str, Enum):
 @dataclass
 class Block:
     kind: BlockKind
-    text: str
+    text: str = ""
+    # A right-aligned companion on the same line (dates against a role/company,
+    # or a location). Renderers push it to the right margin; plain-text joins it.
+    right: str = ""
 
 
 # The body sections, keyed for the client's reorder / include-exclude control.
@@ -124,17 +128,19 @@ def _add_experience(blocks: List[Block], resume_data: Dict[str, Any]) -> None:
 
     blocks.append(Block(BlockKind.HEADING, "WORK EXPERIENCE"))
     for entry in experience:
-        heading = " - ".join(
-            part for part in (entry.get("role"), entry.get("company")) if part
-        )
-        if heading:
-            blocks.append(Block(BlockKind.SUBHEADING, str(heading)))
+        company = str(entry.get("company") or "").strip()
+        role = str(entry.get("role") or "").strip()
+        location = str(entry.get("location") or "").strip()
+        dates = _date_range(entry)
 
-        meta = " | ".join(
-            part for part in (_date_range(entry), entry.get("location")) if part
-        )
-        if meta:
-            blocks.append(Block(BlockKind.META, str(meta)))
+        # Line 1 (bold): company, with the location pushed right.
+        # Line 2 (italic): role, with the dates pushed right.
+        if company:
+            blocks.append(Block(BlockKind.SUBHEADING, company, right=location))
+            if role or dates:
+                blocks.append(Block(BlockKind.META, role, right=dates))
+        elif role or dates or location:
+            blocks.append(Block(BlockKind.SUBHEADING, role, right=(dates or location)))
 
         for highlight in entry.get("highlights") or []:
             if str(highlight).strip():
@@ -149,8 +155,9 @@ def _add_projects(blocks: List[Block], resume_data: Dict[str, Any]) -> None:
     blocks.append(Block(BlockKind.HEADING, "PROJECTS"))
     for project in projects:
         name = str(project.get("name") or "").strip()
+        dates = _date_range(project)
         if name:
-            blocks.append(Block(BlockKind.SUBHEADING, name))
+            blocks.append(Block(BlockKind.SUBHEADING, name, right=dates))
 
         stack = ", ".join(str(item) for item in project.get("tech_stack") or [])
         if stack:
@@ -172,17 +179,21 @@ def _add_education(blocks: List[Block], resume_data: Dict[str, Any]) -> None:
 
     blocks.append(Block(BlockKind.HEADING, "EDUCATION"))
     for entry in education:
-        heading = " - ".join(
-            part for part in (entry.get("degree"), entry.get("institution")) if part
-        )
-        if heading:
-            blocks.append(Block(BlockKind.SUBHEADING, str(heading)))
+        institution = str(entry.get("institution") or "").strip()
+        degree = str(entry.get("degree") or "").strip()
+        location = str(entry.get("location") or "").strip()
+        years = _year_range(entry)
+        score = str(entry.get("score") or "").strip()
+        secondary_right = " | ".join(part for part in (years, score) if part)
 
-        meta = " | ".join(
-            str(part) for part in (_year_range(entry), entry.get("location"), entry.get("score")) if part
-        )
-        if meta:
-            blocks.append(Block(BlockKind.META, meta))
+        # Line 1 (bold): institution, location right. Line 2 (italic): degree,
+        # years/score right.
+        if institution:
+            blocks.append(Block(BlockKind.SUBHEADING, institution, right=location))
+            if degree or secondary_right:
+                blocks.append(Block(BlockKind.META, degree, right=secondary_right))
+        elif degree or secondary_right:
+            blocks.append(Block(BlockKind.SUBHEADING, degree, right=secondary_right))
 
         for highlight in entry.get("highlights") or []:
             if str(highlight).strip():
@@ -214,19 +225,38 @@ def _add_achievements(blocks: List[Block], resume_data: Dict[str, Any]) -> None:
         blocks.append(Block(BlockKind.BULLET, item))
 
 
-def _date_range(entry: Dict[str, Any]) -> str:
-    start = str(entry.get("start_date") or "").strip()
-    end = str(entry.get("end_date") or "").strip()
-    if not start and not end:
+_MONTHS = ("Jan", "Feb", "Mar", "Apr", "May", "Jun", "Jul", "Aug", "Sep", "Oct", "Nov", "Dec")
+
+
+def _human_date(value: Any) -> str:
+    """Turn a stored date into something a resume shows: ISO "2025-02" -> "Feb
+    2025", "present" -> "Present", a bare year stays a year, anything else is
+    passed through so a pre-formatted "February 2025" is left alone."""
+    text = str(value or "").strip()
+    if not text:
         return ""
-    return f"{start} - {end}".strip(" -") if start or end else ""
+    if text.lower() in ("present", "current", "now", "ongoing"):
+        return "Present"
+    iso = re.match(r"^(\d{4})-(\d{1,2})", text)
+    if iso:
+        year, month = iso.group(1), int(iso.group(2))
+        return f"{_MONTHS[month - 1]} {year}" if 1 <= month <= 12 else year
+    return text
+
+
+def _date_range(entry: Dict[str, Any]) -> str:
+    start = _human_date(entry.get("start_date"))
+    end = _human_date(entry.get("end_date"))
+    if start and end:
+        return f"{start} – {end}"
+    return start or end or ""
 
 
 def _year_range(entry: Dict[str, Any]) -> str:
     start = entry.get("start_year")
     end = entry.get("end_year")
     if start and end:
-        return f"{start} - {end}"
+        return f"{start} – {end}"
     return str(start or end or "")
 
 

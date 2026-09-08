@@ -70,7 +70,7 @@ export default function UploadPage() {
         setSections(
             SECTION_DEFS.filter((s) => s.has(data)).map((s) => ({ key: s.key, label: s.label, on: true }))
         );
-        setLayout(isDocx ? "original" : "classic");
+        setLayout(isDocx ? "original" : "professional");
         // eslint-disable-next-line react-hooks/exhaustive-deps
     }, [resume]);
 
@@ -90,9 +90,10 @@ export default function UploadPage() {
         ...(isDocx
             ? [{ id: "original", name: "Keep my format", desc: "Your design — colours, fonts, and links kept; only wording is optimized." }]
             : []),
-        { id: "classic", name: "Classic", desc: "Clean single-column, ATS-safe." },
+        { id: "professional", name: "Professional", desc: "Clean, ruled headings, right-aligned dates." },
         { id: "modern", name: "Modern", desc: "Navy accent on the name and headings." },
         { id: "compact", name: "Compact", desc: "Tighter spacing to fit more in." },
+        { id: "minimal", name: "Minimal", desc: "Airy and understated, no rules." },
     ];
 
     // react-dropzone hands rejected files to the second argument instead of
@@ -615,6 +616,12 @@ export default function UploadPage() {
                                     <p className="text-xs font-medium text-muted mb-2 inline-flex items-center gap-1.5">
                                         <LayoutTemplate className="w-3.5 h-3.5" /> Resume layout
                                     </p>
+                                    {!isDocx && (
+                                        <p className="text-[11px] text-muted mb-2 leading-snug">
+                                            Your upload is a PDF, so it&apos;s rebuilt in the template you pick.
+                                            Upload a <span className="font-medium text-foreground">.docx</span> to keep your exact design.
+                                        </p>
+                                    )}
                                     <div className="grid grid-cols-2 sm:grid-cols-4 gap-3">
                                         {layoutOptions.map((option) => {
                                             const active = layout === option.id;
