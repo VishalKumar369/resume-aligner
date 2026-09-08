@@ -133,6 +133,9 @@ class SinglePageCondenser:
         projects = data.get("projects")
         if not isinstance(projects, list) or not projects:
             return False
+        # Keep the section alive: never remove the last project.
+        if len(projects) <= 1:
+            return False
 
         ranked = sorted(
             range(len(projects)),
@@ -151,6 +154,9 @@ class SinglePageCondenser:
     ) -> bool:
         achievements = data.get("achievements")
         if not isinstance(achievements, list) or not achievements:
+            return False
+        # Keep the section alive: never remove the last achievement.
+        if len(achievements) <= 1:
             return False
 
         for i, item in enumerate(achievements):

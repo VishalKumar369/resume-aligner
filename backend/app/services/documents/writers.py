@@ -220,6 +220,11 @@ def render_docx(
         if chosen:
             run.font.color.rgb = _rgb(chosen)
 
+    def _highlight(paragraph) -> None:
+        if highlight_pattern is not None:
+            from app.services.documents.docx_editor import highlight_paragraph
+            highlight_paragraph(paragraph, highlight_pattern)
+
     for block in build_blocks(resume_data, section_order):
         spec = styles.get(block.kind, styles[BlockKind.PARAGRAPH])
 
@@ -242,6 +247,7 @@ def render_docx(
             for run in paragraph.runs:
                 _style_run(run, spec)
             _apply_spacing(paragraph, spec)
+            _highlight(paragraph)
             continue
 
         # A line with a right-aligned companion (dates/location): one run on the
@@ -264,10 +270,9 @@ def render_docx(
 
         if block.kind is BlockKind.HEADING and template.heading_rule:
             _set_bottom_border(paragraph, template.rule_color)
-
-    if highlight_pattern is not None:
-        from app.services.documents.docx_editor import highlight_bullets_in_docx
-        highlight_bullets_in_docx(document, highlight_pattern)
+        elif block.kind is BlockKind.PARAGRAPH:
+            # Summary and "Category: skills" lines carry JD keywords too.
+            _highlight(paragraph)
 
     buffer = BytesIO()
     document.save(buffer)
@@ -429,6 +434,11 @@ def render_pdf_with_page_count(
 
         if block.right:
             story.append(entry_row(block))
+            continue
+
+        if block.kind is BlockKind.PARAGRAPH:
+            # Summary and "Category: skills" lines carry JD keywords too.
+            story.append(Paragraph(_highlight_markup(block.text, highlight_pattern), styles[BlockKind.PARAGRAPH]))
             continue
 
         story.append(Paragraph(_escape(block.text), styles.get(block.kind, styles[BlockKind.PARAGRAPH])))

@@ -43,6 +43,32 @@ class TestSectionOrder:
         assert heads == ["WORK EXPERIENCE"]
 
 
+class TestHighlighting:
+    def test_bolds_jd_keywords_in_skills_and_summary_not_only_bullets(self):
+        import io
+
+        import docx
+
+        from app.services.documents.keyword_highlight import compile_keyword_pattern
+
+        data = {
+            "personal_info": {"name": "V K"},
+            "summary": "Ships features in Python every week.",
+            "skills": {"categories": {"Languages": ["Python", "Java"]}},
+            "experience": [{"company": "Acme", "role": "Eng", "highlights": ["Built with Python"]}],
+        }
+        pattern = compile_keyword_pattern(["Python"])
+        document = docx.Document(io.BytesIO(render_docx(data, pattern, "professional")))
+
+        # "Python" is bold in the summary, the skills line, and the bullet — not
+        # just bullets. (Uppercase heading paragraphs are excluded.)
+        bold_paras = [
+            p for p in document.paragraphs
+            if not p.text.isupper() and any(r.bold and r.text.strip(",") == "Python" for r in p.runs)
+        ]
+        assert len(bold_paras) >= 2
+
+
 class TestLayouts:
     def test_every_layout_renders_docx_and_pdf(self):
         for layout in LAYOUT_IDS:
