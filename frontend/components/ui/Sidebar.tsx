@@ -6,7 +6,7 @@ import Link from "next/link";
 import { usePathname } from "next/navigation";
 import {
     LayoutDashboard, Upload, BookOpen, Building2, Settings,
-    FileText, ChevronLeft, ChevronRight, Target, BarChart3, FolderKanban, X, NotebookPen,
+    FileText, ChevronLeft, ChevronRight, Target, BarChart3, FolderKanban, X, NotebookPen, MessageSquare,
 } from "lucide-react";
 import { cn } from "@/lib/utils";
 import { useUiStore } from "@/store/uiStore";
@@ -36,6 +36,7 @@ const navItems = [
             { href: "/notes", icon: NotebookPen, label: "Notes" },
         ],
     },
+    { href: "/feedback", icon: MessageSquare, label: "Feedback" },
     { href: "/settings", icon: Settings, label: "Settings" },
 ];
 

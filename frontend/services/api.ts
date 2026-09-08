@@ -182,6 +182,19 @@ export const noteService = {
     remove: (id: string) => api.delete(`/notes/${id}`),
 };
 
+export interface FeedbackInput {
+    message: string;
+    rating?: number;
+    email?: string;
+    source?: "landing" | "settings" | "app";
+}
+
+/** Product feedback. Anonymous from the landing page; attributed to the account
+ *  when a token is present (the axios instance adds it if signed in). */
+export const feedbackService = {
+    submit: (data: FeedbackInput) => api.post("/feedback", data),
+};
+
 /** Matches the backend's slugify, so links built here resolve server-side. */
 export const companySlug = (name: string) =>
     (name || "").toLowerCase().replace(/[^a-z0-9]+/g, "-").replace(/^-+|-+$/g, "");
