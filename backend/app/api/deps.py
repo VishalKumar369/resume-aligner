@@ -57,6 +57,16 @@ async def get_current_user_id(user: User = Depends(get_current_user)) -> UUID:
     return user.id
 
 
+async def get_current_admin(user: User = Depends(get_current_user)) -> User:
+    """The signed-in user, but only if their email is in ADMIN_EMAILS; else 403."""
+    if (user.email or "").strip().lower() not in settings.admin_email_set:
+        raise HTTPException(
+            status_code=status.HTTP_403_FORBIDDEN,
+            detail="Admin access required.",
+        )
+    return user
+
+
 async def _user_from_token(token: Optional[str], db: AsyncSession) -> Optional[User]:
     if not token:
         return None

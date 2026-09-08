@@ -3,6 +3,7 @@
 import { Sidebar } from "@/components/ui/Sidebar";
 import { TopNavbar } from "@/components/ui/TopNavbar";
 import { FeedbackSection } from "@/components/ui/FeedbackSection";
+import { FeedbackInbox } from "@/components/ui/FeedbackInbox";
 
 export default function FeedbackPage() {
     return (
@@ -19,6 +20,9 @@ export default function FeedbackPage() {
                             </p>
                         </div>
                         <FeedbackSection source="app" />
+
+                        {/* Renders only for admins (ADMIN_EMAILS); hidden otherwise. */}
+                        <FeedbackInbox />
                     </div>
                 </main>
             </div>

@@ -76,3 +76,41 @@ class TestSchema:
     def test_unknown_source_is_dropped(self):
         assert FeedbackCreate(message="x", source="somewhere").source is None
         assert FeedbackCreate(message="x", source="landing").source == "landing"
+
+
+class TestAdminList:
+    @pytest.mark.asyncio
+    async def test_returns_every_submission(self, monkeypatch):
+        rows = [SimpleNamespace(id=uuid.uuid4(), rating=5, message="Great", created_at=datetime(2026, 9, 9))]
+
+        class FakeRepo:
+            def __init__(self, model, db):
+                pass
+
+            async def list_all(self, *, skip=0, limit=200):
+                return rows
+
+        monkeypatch.setattr(feedback_routes, "FeedbackRepository", FakeRepo)
+        result = await feedback_routes.list_feedback(
+            skip=0, limit=200, db=FakeDB(), _admin=SimpleNamespace(email="a@x.com")
+        )
+        assert result == rows
+
+
+class TestAdminGate:
+    @pytest.mark.asyncio
+    async def test_non_admin_is_forbidden(self, monkeypatch):
+        from app.api import deps
+
+        monkeypatch.setattr(deps.settings, "ADMIN_EMAILS", "boss@x.com")
+        with pytest.raises(Exception) as caught:
+            await deps.get_current_admin(user=SimpleNamespace(email="normal@x.com"))
+        assert getattr(caught.value, "status_code", None) == 403
+
+    @pytest.mark.asyncio
+    async def test_admin_is_allowed_case_insensitively(self, monkeypatch):
+        from app.api import deps
+
+        monkeypatch.setattr(deps.settings, "ADMIN_EMAILS", "boss@x.com, other@x.com")
+        user = SimpleNamespace(email="Boss@X.com")
+        assert await deps.get_current_admin(user=user) is user

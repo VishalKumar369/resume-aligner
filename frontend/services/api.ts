@@ -193,6 +193,8 @@ export interface FeedbackInput {
  *  when a token is present (the axios instance adds it if signed in). */
 export const feedbackService = {
     submit: (data: FeedbackInput) => api.post("/feedback", data),
+    // Admin-only (ADMIN_EMAILS); non-admins get 403.
+    list: () => api.get("/feedback"),
 };
 
 /** Matches the backend's slugify, so links built here resolve server-side. */

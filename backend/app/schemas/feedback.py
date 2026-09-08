@@ -49,3 +49,10 @@ class FeedbackOut(BaseModel):
     created_at: datetime
 
     model_config = ConfigDict(from_attributes=True)
+
+
+class FeedbackAdminOut(FeedbackOut):
+    """The full record, for the admin inbox."""
+    owner_id: Optional[UUID] = None
+    email: Optional[str] = None
+    source: Optional[str] = None

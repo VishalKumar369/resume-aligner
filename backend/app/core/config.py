@@ -12,7 +12,14 @@ class Settings(BaseSettings):
     
     # Environment
     ENVIRONMENT: str = "development" # development, staging, production
-    
+
+    # Comma-separated emails allowed to read the feedback inbox (admins).
+    ADMIN_EMAILS: str = ""
+
+    @property
+    def admin_email_set(self) -> set:
+        return {e.strip().lower() for e in self.ADMIN_EMAILS.split(",") if e.strip()}
+
     # PostgreSQL
     POSTGRES_SERVER: str = "localhost"
     POSTGRES_USER: str = "postgres"
