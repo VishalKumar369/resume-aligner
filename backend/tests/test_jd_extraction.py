@@ -5,6 +5,7 @@ import pytest
 from app.schemas.jd_structured import JD_SCHEMA_VERSION, JDStructuredData
 from app.services.parsing.heuristic_jd_extractor import HeuristicJDExtractor
 from app.services.parsing.jd_extractor_selector import JDExtractorSelector
+from app.services.parsing.jd_parser import JDParserService
 from app.services.parsing.jd_sections import JDSection, match_jd_section_header, split_jd_sections
 from app.services.parsing.llm_jd_extractor import LLMJDExtractionError, LLMJDExtractor
 
@@ -186,6 +187,21 @@ class TestHeuristicJDExtractor:
         parsed = HeuristicJDExtractor().extract(jd)
         assert parsed.company is None
 
+    def test_ignores_board_artifacts_and_reads_the_real_title_and_company(self):
+        # A Workable-style export: a "Description" opener, an "About <Company>"
+        # line, and the title stated in prose under "The Role".
+        jd = (
+            "Description\n"
+            "About Writesonic\n\n"
+            "We help brands dominate AI search visibility.\n\n"
+            "The Role\n"
+            "We're hiring a Frontend Engineer who obsesses over pixels.\n\n"
+            "Requirements\n- 2-5 years shipping React/Next.js apps\n"
+        )
+        parsed = HeuristicJDExtractor().extract(jd)
+        assert parsed.role == "Frontend Engineer"
+        assert parsed.company == "Writesonic"
+
     def test_parses_a_bounded_experience_range(self):
         jd = "Engineer\n\nRequirements\n- 3-5 years of experience with Java\n"
         parsed = HeuristicJDExtractor().extract(jd)
@@ -291,3 +307,27 @@ class TestJDExtractorSelector:
     async def test_empty_text_returns_a_valid_empty_structure(self):
         parsed = await JDExtractorSelector(prefer_llm=False).extract("  ")
         assert parsed.extraction_meta["extractor"] == "none"
+
+
+class TestJDParserUrlFallback:
+    """The posting URL fills the company only when the text names none."""
+
+    def _parser(self) -> JDParserService:
+        # Heuristic-only, so the test never depends on a model provider.
+        return JDParserService(selector=JDExtractorSelector(prefer_llm=False))
+
+    @pytest.mark.asyncio
+    async def test_recovers_company_from_the_url_when_text_has_none(self):
+        text = "Frontend Engineer\n\nRequirements\n- React and TypeScript\n"
+        result = await self._parser().parse(
+            text, url="https://apply.workable.com/writesonic/j/ABC/"
+        )
+        assert result["company"] == "Writesonic"
+
+    @pytest.mark.asyncio
+    async def test_text_company_wins_over_the_url(self):
+        text = "Senior Backend Engineer\nInitech\n\nRequirements\n- Java\n"
+        result = await self._parser().parse(
+            text, url="https://apply.workable.com/writesonic/j/ABC/"
+        )
+        assert result["company"] == "Initech"

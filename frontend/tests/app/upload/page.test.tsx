@@ -158,7 +158,9 @@ describe("UploadPage — single vs multi page length", () => {
 
         await clickPrimary(/Optimize Resume/i);
 
-        expect(resumeService.optimize).toHaveBeenCalledWith("r-1", "j-1", { pagePreference: "single" });
+        expect(resumeService.optimize).toHaveBeenCalledWith(
+            "r-1", "j-1", expect.objectContaining({ pagePreference: "single" })
+        );
     });
 
     it("switches to multi page when the user picks it", async () => {
@@ -169,7 +171,9 @@ describe("UploadPage — single vs multi page length", () => {
 
         await clickPrimary(/Optimize Resume/i);
 
-        expect(resumeService.optimize).toHaveBeenCalledWith("r-1", "j-1", { pagePreference: "multi" });
+        expect(resumeService.optimize).toHaveBeenCalledWith(
+            "r-1", "j-1", expect.objectContaining({ pagePreference: "multi" })
+        );
     });
 
     it("reports what condensing did on the result step", async () => {

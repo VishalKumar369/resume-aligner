@@ -13,7 +13,7 @@ in the resume, and every LLM rewrite passes the fact guard before it is applied.
 import copy
 import logging
 from dataclasses import dataclass, field
-from typing import Any, Dict, List, Optional
+from typing import Any, Dict, List, Optional, Sequence
 
 from app.services.ai.cache import LLMCache, cache_key
 from app.services.ai.factory import AIFactory
@@ -108,6 +108,7 @@ class OptimizationEngine:
         resume_text: str = "",
         extraction_meta: Optional[Dict[str, Any]] = None,
         single_page: bool = False,
+        section_order: Optional[Sequence[str]] = None,
     ) -> OptimizationResult:
         result = OptimizationResult(single_page=single_page)
 
@@ -131,7 +132,8 @@ class OptimizationEngine:
 
         # The generated document is what a screener will actually read, so the
         # new scores are computed against its rendering, not the original file.
-        optimized_text = render_text(optimized)
+        # Honour the chosen section set so an excluded section is not scored.
+        optimized_text = render_text(optimized, section_order)
         optimized_meta = self._generated_document_meta(optimized_text, result.page_count)
         result.ats_score, result.alignment_score = await self._score(
             optimized, jd_data, optimized_text, optimized_meta

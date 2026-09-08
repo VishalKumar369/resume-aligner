@@ -16,7 +16,25 @@ from app.services.parsing.line_utils import (
     merge_wrapped_lines,
     strip_bullet,
 )
+from app.services.parsing.section_utils import normalize_label
 from app.services.parsing.skill_vocabulary import find_skills, normalize_skill
+
+# Section/board artifact lines that are never a role or a company on their own.
+# Job boards (Workable, Greenhouse, …) prepend "Description"; postings open with
+# "About", "The Role", "Overview", etc. Any of these landing in the header block
+# must not be mistaken for the title or the employer.
+_GENERIC_LABELS = frozenset({
+    "description", "job description", "the role", "role", "position",
+    "about", "about us", "about the role", "about the company", "the company",
+    "company overview", "overview", "summary", "job summary", "profile",
+    "responsibilities", "requirements", "qualifications", "benefits",
+    "the opportunity", "opportunity", "who we are", "what we offer",
+    "what you ll do", "job details", "details", "job overview",
+})
+
+
+def _is_generic_label(line: str) -> bool:
+    return normalize_label(line) in _GENERIC_LABELS
 
 _LOCATION_LABEL = re.compile(r"^\s*location\s*[:\-]\s*(?P<value>.+)$", re.IGNORECASE)
 _WORK_MODE = re.compile(r"\b(remote|hybrid|on-?site|work from home|wfh|in-office)\b", re.IGNORECASE)
@@ -166,20 +184,30 @@ class HeuristicJDExtractor:
             if labelled:
                 return self._strip_trailing_meta(labelled.group("value"))
 
-        # A title-shaped header line (the common structured case).
+        # A title-shaped header line carrying a role noun (the common case).
         for line in header_lines:
             candidate = strip_bullet(line)
+            if _is_generic_label(candidate):
+                continue
             if _TITLE_HINT.search(candidate) and self._looks_like_a_title(candidate):
                 return self._strip_trailing_meta(candidate)
 
-        # A header line that is title-shaped even without a title noun.
-        first = strip_bullet(header_lines[0]) if header_lines else ""
-        if self._looks_like_a_title(first):
-            return self._strip_trailing_meta(first)
-
-        # Last, a title trailing a hiring cue in prose ("looking for a X").
+        # A title trailing a hiring cue in prose ("looking for a Frontend
+        # Engineer"). This beats the weak header fallback below, so a board's
+        # "Description"/"About …" opener can't win over the real title.
         cued = _ROLE_CUE.search(text)
-        return cued.group("value").strip() if cued else None
+        if cued:
+            return cued.group("value").strip()
+
+        # Last, the first header line that is title-shaped even without a role
+        # noun — skipping generic labels and "About <Company>" boilerplate.
+        for line in header_lines:
+            candidate = strip_bullet(line)
+            if _is_generic_label(candidate) or candidate.lower().startswith("about "):
+                continue
+            if self._looks_like_a_title(candidate):
+                return self._strip_trailing_meta(candidate)
+        return None
 
     def _parse_company(
         self, text: str, header_lines: List[str], role: Optional[str]
@@ -191,17 +219,26 @@ class HeuristicJDExtractor:
                 return labelled.group("value").strip() or None
 
         # Otherwise the company sits on its own header line, often followed by
-        # a location: "Acme Technologies - Bengaluru, India (Hybrid)".
+        # a location: "Acme Technologies - Bengaluru, India (Hybrid)", or under
+        # an "About <Company>" opener.
         for line in header_lines:
             candidate = strip_bullet(line)
-            if not candidate or candidate == role:
+            if not candidate or candidate == role or _is_generic_label(candidate):
                 continue
+
+            # "About Writesonic" -> "Writesonic"; "About Initech we build …" ->
+            # "Initech" (the capitalized run stops at the first lowercase word).
+            # Generic openers ("About us/the role") were dropped above.
+            if candidate.lower().startswith("about"):
+                about = _COMPANY_ABOUT.search(candidate)
+                value = about.group("value").strip() if about else ""
+                if value and value.split()[0].lower() not in _ABOUT_STOP:
+                    return self._clean_company(value)
+                continue
+
             if _TITLE_HINT.search(candidate) or not self._looks_like_a_title(candidate):
                 continue
-            company = self._split_on_separator(candidate)[0]
-            company = _WORK_MODE.sub("", company)
-            company = _EMPLOYMENT_TYPE.sub("", company)
-            company = company.strip(" ,|-()")
+            company = self._clean_company(candidate)
             if company:
                 return company
 
@@ -229,6 +266,13 @@ class HeuristicJDExtractor:
                 if "," in cleaned and len(cleaned.split()) <= 5:
                     return cleaned
         return None
+
+    def _clean_company(self, candidate: str) -> Optional[str]:
+        """Peel a trailing location/mode off a company line and tidy it."""
+        company = self._split_on_separator(candidate)[0]
+        company = _WORK_MODE.sub("", company)
+        company = _EMPLOYMENT_TYPE.sub("", company)
+        return company.strip(" ,|-()") or None
 
     def _split_on_separator(self, line: str) -> List[str]:
         for separator in (" - ", " – ", " | ", " · ", ", "):

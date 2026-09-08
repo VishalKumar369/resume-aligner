@@ -10,7 +10,7 @@ of the ATS score rewards, and what breaks resume parsers when absent.
 
 from dataclasses import dataclass
 from enum import Enum
-from typing import Any, Dict, List
+from typing import Any, Callable, Dict, List, Optional, Sequence
 
 from app.schemas.structured import entries
 
@@ -31,7 +31,21 @@ class Block:
     text: str
 
 
-def build_blocks(resume_data: Dict[str, Any]) -> List[Block]:
+# The body sections, keyed for the client's reorder / include-exclude control.
+# The header (name, title, contact) is always first and is not reorderable.
+SECTION_BUILDERS: Dict[str, Callable[[List["Block"], Dict[str, Any]], None]] = {}
+
+
+def build_blocks(
+    resume_data: Dict[str, Any], section_order: Optional[Sequence[str]] = None
+) -> List[Block]:
+    """The ordered block list.
+
+    ``section_order`` picks which body sections appear and in what order (keys
+    from ``SECTION_BUILDERS``). A section left out of the list is excluded; a
+    section named but absent from the resume simply renders nothing. Passing
+    None keeps the default order with every section.
+    """
     blocks: List[Block] = []
     personal = resume_data.get("personal_info", {}) or {}
 
@@ -47,13 +61,15 @@ def build_blocks(resume_data: Dict[str, Any]) -> List[Block]:
     if contact:
         blocks.append(Block(BlockKind.CONTACT, contact))
 
-    _add_summary(blocks, resume_data)
-    _add_skills(blocks, resume_data)
-    _add_experience(blocks, resume_data)
-    _add_projects(blocks, resume_data)
-    _add_education(blocks, resume_data)
-    _add_certifications(blocks, resume_data)
-    _add_achievements(blocks, resume_data)
+    order = [key for key in (section_order or DEFAULT_SECTION_ORDER) if key in SECTION_BUILDERS]
+    if not order:
+        order = list(DEFAULT_SECTION_ORDER)
+    seen = set()
+    for key in order:
+        if key in seen:
+            continue
+        seen.add(key)
+        SECTION_BUILDERS[key](blocks, resume_data)
 
     return blocks
 
@@ -212,3 +228,21 @@ def _year_range(entry: Dict[str, Any]) -> str:
     if start and end:
         return f"{start} - {end}"
     return str(start or end or "")
+
+
+# Registered after the builders exist. The order here is the sensible default
+# used when the client sends none.
+DEFAULT_SECTION_ORDER = (
+    "summary", "skills", "experience", "projects",
+    "education", "certifications", "achievements",
+)
+
+SECTION_BUILDERS.update({
+    "summary": _add_summary,
+    "skills": _add_skills,
+    "experience": _add_experience,
+    "projects": _add_projects,
+    "education": _add_education,
+    "certifications": _add_certifications,
+    "achievements": _add_achievements,
+})

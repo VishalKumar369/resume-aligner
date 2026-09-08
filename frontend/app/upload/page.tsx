@@ -1,12 +1,13 @@
 "use client";
 
-import { useState, useCallback, useRef } from "react";
+import { useState, useCallback, useEffect, useRef } from "react";
 import { motion, AnimatePresence } from "framer-motion";
 import { useDropzone, type FileRejection } from "react-dropzone";
 import { useRouter } from "next/navigation";
 import {
     Upload, FileText, CheckCircle, Loader2, Link as LinkIcon, Sparkles,
     ShieldCheck, Download, AlertTriangle, FileStack, Building2, Briefcase, RotateCcw,
+    LayoutTemplate, ListChecks, Check, ArrowUp, ArrowDown,
 } from "lucide-react";
 import { cn } from "@/lib/utils";
 import { resumeService, jdService, alignmentService, dashboardService, apiErrorMessage } from "@/services/api";
@@ -19,6 +20,17 @@ const steps = [
     { id: 3, title: "Preview" },
     { id: 4, title: "Optimize" },
     { id: 5, title: "Analytics" },
+];
+
+// The reorderable/hideable body sections, and how to tell one is present.
+const SECTION_DEFS: { key: string; label: string; has: (d: any) => boolean }[] = [
+    { key: "summary", label: "Summary", has: (d) => !!(d.summary || "").trim?.() },
+    { key: "skills", label: "Skills", has: (d) => !!(Object.keys(d.skills?.categories || {}).length || d.skills?.hard_skills?.length) },
+    { key: "experience", label: "Experience", has: (d) => !!d.experience?.length },
+    { key: "projects", label: "Projects", has: (d) => !!d.projects?.length },
+    { key: "education", label: "Education", has: (d) => !!d.education?.length },
+    { key: "certifications", label: "Certifications", has: (d) => !!d.certifications?.length },
+    { key: "achievements", label: "Achievements", has: (d) => !!d.achievements?.length },
 ];
 
 export default function UploadPage() {
@@ -34,6 +46,9 @@ export default function UploadPage() {
     // Most resumes should stay to one page, so single is the default. The user
     // can switch to multi when they have enough relevant content to justify it.
     const [pagePreference, setPagePreference] = useState<"single" | "multi">("single");
+    // Layout & section controls for step 3. "original" keeps the uploaded .docx.
+    const [layout, setLayout] = useState<string>("original");
+    const [sections, setSections] = useState<{ key: string; label: string; on: boolean }[]>([]);
     const [processing, setProcessing] = useState(false);
     const [resume, setResume] = useState<any>(null);
     const [jdId, setJdId] = useState<string | null>(null);
@@ -43,6 +58,42 @@ export default function UploadPage() {
     const [error, setError] = useState<string | null>(null);
     // Lets the "Paste JD" prompt jump focus straight to the paste box below it.
     const jdTextareaRef = useRef<HTMLTextAreaElement>(null);
+
+    // Only a .docx upload can be preserved as-is; a PDF must be rebuilt.
+    const isDocx = (resume?.filename || uploadedFile?.name || "").toLowerCase().endsWith(".docx");
+
+    // Seed the section list (present sections only) and the default layout once
+    // the resume is parsed.
+    useEffect(() => {
+        if (!resume) return;
+        const data = resume.structured_data || {};
+        setSections(
+            SECTION_DEFS.filter((s) => s.has(data)).map((s) => ({ key: s.key, label: s.label, on: true }))
+        );
+        setLayout(isDocx ? "original" : "classic");
+        // eslint-disable-next-line react-hooks/exhaustive-deps
+    }, [resume]);
+
+    const moveSection = (index: number, delta: number) =>
+        setSections((prev) => {
+            const target = index + delta;
+            if (target < 0 || target >= prev.length) return prev;
+            const next = [...prev];
+            [next[index], next[target]] = [next[target], next[index]];
+            return next;
+        });
+
+    const toggleSection = (index: number) =>
+        setSections((prev) => prev.map((s, i) => (i === index ? { ...s, on: !s.on } : s)));
+
+    const layoutOptions = [
+        ...(isDocx
+            ? [{ id: "original", name: "Keep my format", desc: "Your design — colours, fonts, and links kept; only wording is optimized." }]
+            : []),
+        { id: "classic", name: "Classic", desc: "Clean single-column, ATS-safe." },
+        { id: "modern", name: "Modern", desc: "Navy accent on the name and headings." },
+        { id: "compact", name: "Compact", desc: "Tighter spacing to fit more in." },
+    ];
 
     // react-dropzone hands rejected files to the second argument instead of
     // onDrop's accepted list, so an image or a .txt would otherwise vanish
@@ -144,7 +195,14 @@ export default function UploadPage() {
 
         if (currentStep === 3) {
             return run(async () => {
-                const { data } = await resumeService.optimize(resume.id, jdId!, { pagePreference });
+                // Section order/exclusion only applies when rebuilding (not "original").
+                const enabledSections =
+                    layout === "original" ? undefined : sections.filter((s) => s.on).map((s) => s.key);
+                const { data } = await resumeService.optimize(resume.id, jdId!, {
+                    pagePreference,
+                    layout,
+                    sections: enabledSections,
+                });
                 setOptimization(data);
                 setCurrentStep(4);
             });
@@ -190,7 +248,7 @@ export default function UploadPage() {
         (currentStep === 2 && !jd && !jdText.trim());
 
     return (
-        <div className="max-w-7xl mx-auto p-4 sm:p-6">
+        <div className="max-w-8xl mx-auto p-4 sm:p-6">
             <div className="mb-6">
                 <h1 className="text-2xl font-bold">New analysis</h1>
                 <p className="text-sm text-muted mt-1">
@@ -293,11 +351,11 @@ export default function UploadPage() {
                                     </p>
                                 </div>
 
-                                <div className="grid md:grid-cols-2 gap-6 items-start">
+                                <div className="grid md:grid-cols-2 gap-6">
                                     {/* The resume already parsed in step 1. */}
-                                    <div>
+                                    <div className="flex flex-col">
                                         <p className="text-sm font-medium text-muted mb-2">Resume uploaded</p>
-                                        <div className="card-elevated rounded-2xl p-4 flex items-center gap-3">
+                                        <div className="card-elevated rounded-2xl p-4 flex flex-1 items-center gap-3">
                                             <div className="w-10 h-10 rounded-lg bg-primary/10 flex items-center justify-center flex-shrink-0">
                                                 <FileText className="w-5 h-5 text-primary" />
                                             </div>
@@ -312,12 +370,12 @@ export default function UploadPage() {
                                     </div>
 
                                     {/* Prompt — the working paste box sits directly below. */}
-                                    <div>
+                                    <div className="flex flex-col">
                                         <p className="text-sm font-medium text-muted mb-2">Job description</p>
                                         <button
                                             type="button"
                                             onClick={() => jdTextareaRef.current?.focus()}
-                                            className="w-full card-elevated rounded-2xl border-2 border-dashed border-border p-8 text-center hover:border-primary/50 transition-colors"
+                                            className="w-full flex-1 flex flex-col items-center justify-center card-elevated rounded-2xl border-2 border-dashed border-border p-8 text-center hover:border-primary/50 transition-colors"
                                         >
                                             <div className="w-12 h-12 rounded-xl bg-surface-2 flex items-center justify-center mx-auto mb-3">
                                                 <Upload className="w-6 h-6 text-muted" />
@@ -551,6 +609,87 @@ export default function UploadPage() {
                                         })}
                                     </div>
                                 </div>
+
+                                {/* Layout — keep the uploaded design or rebuild in a template. */}
+                                <div className="pt-2 border-t border-border/50">
+                                    <p className="text-xs font-medium text-muted mb-2 inline-flex items-center gap-1.5">
+                                        <LayoutTemplate className="w-3.5 h-3.5" /> Resume layout
+                                    </p>
+                                    <div className="grid grid-cols-2 sm:grid-cols-4 gap-3">
+                                        {layoutOptions.map((option) => {
+                                            const active = layout === option.id;
+                                            return (
+                                                <button
+                                                    key={option.id}
+                                                    type="button"
+                                                    onClick={() => setLayout(option.id)}
+                                                    aria-pressed={active}
+                                                    className={cn(
+                                                        "text-left rounded-xl border p-3 transition-colors",
+                                                        active
+                                                            ? "border-primary bg-primary/10"
+                                                            : "border-border bg-surface-2 hover:border-primary/40"
+                                                    )}
+                                                >
+                                                    <span className={cn("text-sm font-semibold", active ? "text-primary" : "text-foreground")}>
+                                                        {option.name}
+                                                    </span>
+                                                    <span className="block text-[11px] text-muted mt-1 leading-snug">
+                                                        {option.desc}
+                                                    </span>
+                                                </button>
+                                            );
+                                        })}
+                                    </div>
+                                </div>
+
+                                {/* Sections — reorder / hide (only when rebuilding). */}
+                                {layout !== "original" && sections.length > 0 && (
+                                    <div className="pt-2 border-t border-border/50">
+                                        <p className="text-xs font-medium text-muted mb-2 inline-flex items-center gap-1.5">
+                                            <ListChecks className="w-3.5 h-3.5" /> Sections — reorder or hide
+                                        </p>
+                                        <div className="space-y-1.5">
+                                            {sections.map((section, i) => (
+                                                <div key={section.key} className="flex items-center gap-2 rounded-lg border border-border bg-surface-2 px-3 py-2">
+                                                    <button
+                                                        type="button"
+                                                        onClick={() => toggleSection(i)}
+                                                        aria-pressed={section.on}
+                                                        aria-label={`${section.on ? "Hide" : "Show"} ${section.label}`}
+                                                        className={cn(
+                                                            "w-4 h-4 rounded border flex items-center justify-center flex-shrink-0 transition-colors",
+                                                            section.on ? "bg-primary border-primary text-primary-foreground" : "border-border text-transparent"
+                                                        )}
+                                                    >
+                                                        <Check className="w-3 h-3" />
+                                                    </button>
+                                                    <span className={cn("text-sm flex-1", section.on ? "text-foreground" : "text-muted line-through")}>
+                                                        {section.label}
+                                                    </span>
+                                                    <button
+                                                        type="button"
+                                                        onClick={() => moveSection(i, -1)}
+                                                        disabled={i === 0}
+                                                        aria-label={`Move ${section.label} up`}
+                                                        className="p-1 rounded text-muted hover:text-foreground disabled:opacity-30 disabled:cursor-not-allowed"
+                                                    >
+                                                        <ArrowUp className="w-3.5 h-3.5" />
+                                                    </button>
+                                                    <button
+                                                        type="button"
+                                                        onClick={() => moveSection(i, 1)}
+                                                        disabled={i === sections.length - 1}
+                                                        aria-label={`Move ${section.label} down`}
+                                                        className="p-1 rounded text-muted hover:text-foreground disabled:opacity-30 disabled:cursor-not-allowed"
+                                                    >
+                                                        <ArrowDown className="w-3.5 h-3.5" />
+                                                    </button>
+                                                </div>
+                                            ))}
+                                        </div>
+                                    </div>
+                                )}
                             </div>
                         )}
 

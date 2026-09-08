@@ -22,7 +22,7 @@ export default function SettingsPage() {
             <div className="flex-1 flex flex-col overflow-hidden">
                 <TopNavbar title="Settings" />
                 <main className="flex-1 overflow-y-auto p-6">
-                    <div className="max-w-7xl mx-auto space-y-6">
+                    <div className="max-w-8xl mx-auto space-y-6">
                         <div>
                             <h1 className="text-2xl font-bold">Settings</h1>
                             <p className="text-sm text-muted mt-1">Manage your account preferences</p>

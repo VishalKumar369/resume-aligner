@@ -172,7 +172,7 @@ function NotesContent() {
     if (error) return <div className="max-w-5xl mx-auto"><ErrorState message={error} onRetry={reload} /></div>;
 
     return (
-        <div className="max-w-7xl mx-auto space-y-5">
+        <div className="max-w-8xl mx-auto space-y-5">
             {/* Header */}
             <div className="flex items-start justify-between gap-4 flex-wrap">
                 <div>

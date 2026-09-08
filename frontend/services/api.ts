@@ -94,13 +94,22 @@ export const resumeService = {
     optimize: (
         resumeId: string,
         jdId: string,
-        options: { focusArea?: string; pagePreference?: "single" | "multi" } = {}
+        options: {
+            focusArea?: string;
+            pagePreference?: "single" | "multi";
+            // "original" keeps the uploaded .docx; a template id rebuilds it.
+            layout?: string;
+            // Body sections to include, in order. Only applied when rebuilding.
+            sections?: string[];
+        } = {}
     ) =>
         api.post("/resume/optimize", {
             resume_id: resumeId,
             jd_id: jdId,
             focus_area: options.focusArea || null,
             page_preference: options.pagePreference || "single",
+            layout: options.layout || null,
+            sections: options.sections || null,
         }),
     getVersions: (resumeId: string) => api.get(`/resume/${resumeId}/versions`),
     downloadUrl: (versionId: string, format: "docx" | "pdf") =>
@@ -133,6 +142,9 @@ export const alignmentService = {
     getAll: (params?: { resume_id?: string; jd_id?: string; latest_only?: boolean; limit?: number }) =>
         api.get("/alignment/list", { params }),
     getById: (alignmentId: string) => api.get(`/alignment/${alignmentId}`),
+    // Deletes the run; if it was the JD's last analysis, its posting and
+    // tailored versions go too (see the backend delete endpoint).
+    remove: (alignmentId: string) => api.delete(`/alignment/${alignmentId}`),
 };
 
 // ------------------------------------------------------- dashboard & learning

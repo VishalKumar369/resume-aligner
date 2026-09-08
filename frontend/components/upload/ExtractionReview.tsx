@@ -1,6 +1,6 @@
 "use client";
 
-import { AlertTriangle, Briefcase, GraduationCap, Mail, Phone, MapPin, RotateCcw } from "lucide-react";
+import { AlertTriangle, Briefcase, GraduationCap, Mail, Phone, MapPin, RotateCcw, FolderGit2 } from "lucide-react";
 
 /**
  * Shows what the parser actually got out of the uploaded file.
@@ -131,6 +131,22 @@ export function ExtractionReview({
                                 {[education[0].institution, education[0].end_year].filter(Boolean).join(" · ")}
                             </p>
                         </div>
+                    </div>
+                )}
+
+                {projects.length > 0 && (
+                    <div className="space-y-2">
+                        {projects.slice(0, 4).map((project, i) => (
+                            <div key={i} className="flex gap-2 text-xs">
+                                <FolderGit2 className="w-3.5 h-3.5 text-muted flex-shrink-0 mt-0.5" />
+                                <div className="min-w-0">
+                                    <p className="font-medium">{project.name || "Untitled project"}</p>
+                                    {project.tech_stack?.length > 0 && (
+                                        <p className="text-muted truncate">{project.tech_stack.join(", ")}</p>
+                                    )}
+                                </div>
+                            </div>
+                        ))}
                     </div>
                 )}
             </div>

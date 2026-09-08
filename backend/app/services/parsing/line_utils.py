@@ -5,19 +5,30 @@ from typing import List
 
 from app.services.parsing.date_utils import find_date_range
 
-BULLET_PREFIX = "- "
+# Bullet markers resumes use, across PDF/DOCX exports. The dedicated glyphs
+# (•, ●, ○, ▪, ◦, ‣, ⁃, ·, …) are unambiguous, so a trailing space is optional;
+# the ASCII "-"/"*" and en/em/minus dashes only count as bullets when a space
+# follows, so "-5%", "*args", or a "2021 – 2025" fragment are never mistaken
+# for list items. Without this, glyph-bulleted resumes (the common case) had
+# their bullets merged into the line above and misread as new entries.
+_BULLET_GLYPHS = (
+    "•●○▪■◦‣⁃∙"
+    "·‧⁌⁍◆◇❖❑➔➤➙"
+)
+_BULLET_RE = re.compile(rf"^(?:[{_BULLET_GLYPHS}]+\s*|[-*–—−]\s+)")
 
 _SENTENCE_END = re.compile(r"[.!?:;]['\")\]]?$")
 _CATEGORY_LINE = re.compile(r"^[A-Za-z][A-Za-z0-9 /&+.\-]{1,40}:\s*\S")
 
 
 def is_bullet(line: str) -> bool:
-    return line.strip().startswith(BULLET_PREFIX)
+    return bool(_BULLET_RE.match(line.strip()))
 
 
 def strip_bullet(line: str) -> str:
     stripped = line.strip()
-    return stripped[len(BULLET_PREFIX):].strip() if is_bullet(stripped) else stripped
+    match = _BULLET_RE.match(stripped)
+    return stripped[match.end():].strip() if match else stripped
 
 
 def merge_wrapped_lines(lines: List[str]) -> List[str]:

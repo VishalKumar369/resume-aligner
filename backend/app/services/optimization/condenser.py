@@ -84,12 +84,16 @@ class SinglePageCondenser:
         # Strategies in gentle → aggressive order. Each performs at most one
         # removal and returns True while it still has something to remove. We
         # exhaust each before moving to the next, re-measuring after every cut.
+        # A whole Achievements section (awards, competitive results) is a
+        # differentiator recruiters look for, so it is dropped late — only after
+        # trimming bullets to the floor and shedding low-relevance projects —
+        # rather than before the resume has been leaned out elsewhere.
         strategies = [
             lambda: self._trim_weakest_bullet(resume_data, wanted, self.min_bullets_per_role, result),
             lambda: self._drop_irrelevant_project(resume_data, wanted, result, only_zero=True),
-            lambda: self._drop_irrelevant_achievement(resume_data, wanted, result),
             lambda: self._trim_weakest_bullet(resume_data, wanted, HARD_FLOOR, result),
             lambda: self._drop_irrelevant_project(resume_data, wanted, result, only_zero=False),
+            lambda: self._drop_irrelevant_achievement(resume_data, wanted, result),
             lambda: self._remove_summary(resume_data, result),
         ]
 

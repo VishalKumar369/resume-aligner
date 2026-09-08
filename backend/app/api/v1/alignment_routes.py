@@ -1,8 +1,8 @@
 import uuid
 from typing import Any, Dict, List, Optional
 
-from fastapi import APIRouter, Depends, HTTPException, Query
-from sqlalchemy import select
+from fastapi import APIRouter, Depends, HTTPException, Query, Response, status
+from sqlalchemy import select, update
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.api.deps import get_current_user_id
@@ -10,6 +10,7 @@ from app.db.session import get_db
 from app.models.alignment import AlignmentScore
 from app.models.jd import JobDescription
 from app.models.resume import Resume
+from app.models.version import ResumeVersion
 from app.repositories.alignment_repo import AlignmentRepository
 from app.schemas.analytics import (
     AlignmentDetailSchema,
@@ -87,6 +88,56 @@ async def get_alignment(
     if not row or not await repo.is_owned_by(row, owner_id, db):
         raise HTTPException(status_code=404, detail="Alignment not found")
     return _to_detail(row)
+
+
+@router.delete("/{alignment_id}", status_code=status.HTTP_204_NO_CONTENT)
+async def delete_alignment(
+    alignment_id: uuid.UUID,
+    db: AsyncSession = Depends(get_db),
+    owner_id: uuid.UUID = Depends(get_current_user_id),
+):
+    """Delete a stored analysis and everything that only existed for it.
+
+    The run itself is always removed. When it was the *only* remaining analysis
+    for its job description, the posting and any tailored resume versions built
+    for it are removed too, so the analysis also disappears from Company
+    Intelligence and Resume Versions. A re-run's sibling analyses keep the JD
+    alive, so deleting one run never orphans another.
+    """
+    repo = AlignmentRepository(AlignmentScore, db)
+    row = await repo.get(alignment_id)
+    if not row or not await repo.is_owned_by(row, owner_id, db):
+        raise HTTPException(status_code=404, detail="Alignment not found")
+
+    jd_id = row.jd_id
+    row.is_deleted = True
+
+    # Any other live run still referencing this posting?
+    other_run = (
+        await db.execute(
+            select(AlignmentScore.id).where(
+                AlignmentScore.jd_id == jd_id,
+                AlignmentScore.is_deleted == False,
+                AlignmentScore.id != alignment_id,
+            )
+        )
+    ).first()
+
+    if other_run is None:
+        # Last analysis for this posting: retire the JD (removing it from
+        # Company Intelligence) and the resume versions tailored to it.
+        jd = await db.get(JobDescription, jd_id)
+        if jd is not None and jd.owner_id == owner_id:
+            jd.is_deleted = True
+        await db.execute(
+            update(ResumeVersion)
+            .where(ResumeVersion.jd_id == jd_id, ResumeVersion.is_deleted == False)
+            .values(is_deleted=True)
+            .execution_options(synchronize_session=False)
+        )
+
+    await db.commit()
+    return Response(status_code=status.HTTP_204_NO_CONTENT)
 
 
 async def _assert_owns_pair(db, resume_id, jd_id, owner_id) -> None:

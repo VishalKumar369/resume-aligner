@@ -42,7 +42,8 @@ async def upload_jd(
     if existing is not None:
         return existing
 
-    structured_data = await JDParserService().parse(raw_text)
+    jd_url = str(jd_in.url) if jd_in.url else None
+    structured_data = await JDParserService().parse(raw_text, url=jd_url)
     jd = await repo.create(obj_in={
         "owner_id": owner_id,
         "title": _resolve(jd_in.title, structured_data.get("role")) or "Untitled role",

@@ -31,19 +31,21 @@ const legendItems = [
 export function SkillHeatmap({
     skills,
     linkForSkill,
+    className,
 }: {
     skills: HeatmapSkill[];
     // When provided, each tile links here (e.g. to the learning roadmap).
     linkForSkill?: (skill: string) => string;
+    className?: string;
 }) {
     return (
         <motion.div
             initial={{ opacity: 0, y: 16 }}
             animate={{ opacity: 1, y: 0 }}
             transition={{ duration: 0.4, delay: 0.1 }}
-            className="card-elevated rounded-2xl p-6"
+            className={cn("card-elevated rounded-2xl p-6 flex flex-col", className)}
         >
-            <div className="flex items-center justify-between mb-4 gap-4 flex-wrap">
+            <div className="flex items-center justify-between mb-4 gap-4 flex-wrap flex-shrink-0">
                 <div>
                     <h3 className="text-sm font-semibold text-foreground">Skill Heatmap</h3>
                     <p className="text-xs text-muted mt-1">Your skills against what your target roles ask for</p>
@@ -63,7 +65,7 @@ export function SkillHeatmap({
                     Analyze a resume against a job description to populate this.
                 </p>
             ) : (
-                <div className="flex flex-wrap gap-2">
+                <div className="flex flex-wrap gap-2 content-start overflow-y-auto flex-1 min-h-0 pr-1">
                     {skills.map((skill, i) => {
                         const tile = (
                             <motion.div

@@ -1,5 +1,5 @@
 from datetime import datetime
-from typing import Any, Dict, Literal, Optional
+from typing import Any, Dict, List, Literal, Optional
 from uuid import UUID
 from pydantic import BaseModel, ConfigDict
 
@@ -38,3 +38,10 @@ class ResumeOptimizeRequest(BaseModel):
     # "single" condenses the resume to fit one page (quantity trimmed, the most
     # job-relevant content kept); "multi" leaves it at its natural length.
     page_preference: Literal["single", "multi"] = "single"
+    # "original" keeps the uploaded .docx exactly as designed (default for a
+    # .docx upload); "classic"/"modern"/"compact" rebuild it in that template.
+    layout: Optional[str] = None
+    # Body sections to include, in order (keys: summary, skills, experience,
+    # projects, education, certifications, achievements). None keeps the default
+    # set and order. Only applied when rebuilding (not in "original").
+    sections: Optional[List[str]] = None
