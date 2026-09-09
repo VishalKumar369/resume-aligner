@@ -52,6 +52,13 @@ export default function LoginPage() {
             // Redirect to dashboard on success
             router.push("/dashboard");
         } catch (err: any) {
+            // The account exists but its email isn't verified — send them to the
+            // code screen (resending a fresh code on the way).
+            if (err?.response?.status === 403) {
+                try { await authService.resendVerification(cleanEmail); } catch { /* ignore */ }
+                router.push(`/auth/verify?email=${encodeURIComponent(cleanEmail)}`);
+                return;
+            }
             setError(err.response?.data?.detail || "Invalid email or password");
         } finally {
             setIsLoading(false);

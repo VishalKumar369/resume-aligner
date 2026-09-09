@@ -127,6 +127,14 @@ def _is_body_bullet(paragraph) -> bool:
     return style_name.startswith("List") or is_bullet(paragraph.text)
 
 
+def highlight_paragraph(paragraph, pattern: Optional[Pattern]) -> int:
+    """Bold the keyword matches in one specific paragraph (used by the template
+    renderer, which knows exactly which paragraphs are bullets/skills/summary)."""
+    if pattern is None:
+        return 0
+    return _highlight_paragraph(paragraph, pattern)
+
+
 def _highlight_paragraph(paragraph, pattern: Pattern) -> int:
     # Snapshot the runs: highlighting a run inserts new sibling runs after it,
     # which must not be re-processed.

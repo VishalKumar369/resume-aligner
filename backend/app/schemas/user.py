@@ -34,8 +34,26 @@ class UserUpdate(UserBase):
 class UserOut(UserBase):
     id: UUID
     created_at: datetime
+    email_verified: bool = True
 
     model_config = ConfigDict(from_attributes=True)
+
+class VerifyEmailRequest(BaseModel):
+    email: EmailStr
+    code: str
+
+    @field_validator("email", mode="before")
+    @classmethod
+    def _norm(cls, v: Optional[str]) -> Optional[str]:
+        return v.strip().lower() if isinstance(v, str) else v
+
+class ResendVerificationRequest(BaseModel):
+    email: EmailStr
+
+    @field_validator("email", mode="before")
+    @classmethod
+    def _norm(cls, v: Optional[str]) -> Optional[str]:
+        return v.strip().lower() if isinstance(v, str) else v
 
 class Token(BaseModel):
     access_token: str

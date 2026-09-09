@@ -8,6 +8,7 @@ import {
 } from "lucide-react";
 import Link from "next/link";
 import { ThemeToggle } from "@/components/ui/ThemeToggle";
+import { FeedbackSection } from "@/components/ui/FeedbackSection";
 
 const PLATFORM_NAME = process.env.NEXT_PUBLIC_PLATFORM_NAME || "Resume JD Aligner";
 
@@ -391,6 +392,17 @@ export default function LandingPage() {
                         </motion.details>
                     ))}
                 </div>
+            </section>
+
+            {/* Feedback */}
+            <section id="feedback" className="py-16 sm:py-24 max-w-2xl mx-auto px-6">
+                <div className="text-center mb-8">
+                    <h2 className="text-2xl sm:text-3xl font-bold">We&apos;d love your feedback</h2>
+                    <p className="text-muted-foreground mt-2">
+                        Tried it out or have an idea? Tell us what would make it better.
+                    </p>
+                </div>
+                <FeedbackSection source="landing" />
             </section>
 
             {/* CTA */}

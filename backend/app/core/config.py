@@ -12,7 +12,29 @@ class Settings(BaseSettings):
     
     # Environment
     ENVIRONMENT: str = "development" # development, staging, production
-    
+
+    # Comma-separated emails allowed to read the feedback inbox (admins).
+    ADMIN_EMAILS: str = ""
+
+    @property
+    def admin_email_set(self) -> set:
+        return {e.strip().lower() for e in self.ADMIN_EMAILS.split(",") if e.strip()}
+
+    # --- Email verification (OTP at signup) ---------------------------------
+    # The single switch: when False, signup/login behave as before. Keep the
+    # frontend flag NEXT_PUBLIC_EMAIL_VERIFICATION_ENABLED in step with this.
+    EMAIL_VERIFICATION_ENABLED: bool = False
+    OTP_EXPIRE_MINUTES: int = 10
+    OTP_MAX_ATTEMPTS: int = 5
+    # SMTP to actually send the code. Leave SMTP_HOST empty to instead log the
+    # code to the server console (development — no email account needed).
+    SMTP_HOST: str = ""
+    SMTP_PORT: int = 587
+    SMTP_USER: str = ""
+    SMTP_PASSWORD: str = ""
+    SMTP_FROM: str = ""
+    SMTP_TLS: bool = True
+
     # PostgreSQL
     POSTGRES_SERVER: str = "localhost"
     POSTGRES_USER: str = "postgres"

@@ -53,7 +53,17 @@ export const authService = {
             headers: { "Content-Type": "application/x-www-form-urlencoded" },
         });
     },
+    // Signup email verification (only used when the feature flag is on).
+    verifyEmail: (data: { email: string; code: string }) =>
+        api.post("/auth/verify-email", { email: normalizeEmail(data.email), code: data.code }),
+    resendVerification: (email: string) =>
+        api.post("/auth/resend-verification", { email: normalizeEmail(email) }),
 };
+
+// A single switch for the UI, kept in step with the backend's
+// EMAIL_VERIFICATION_ENABLED. Set NEXT_PUBLIC_EMAIL_VERIFICATION_ENABLED=true.
+export const EMAIL_VERIFICATION_ENABLED =
+    process.env.NEXT_PUBLIC_EMAIL_VERIFICATION_ENABLED === "true";
 
 // ------------------------------------------------------------------ account
 
@@ -180,6 +190,21 @@ export const noteService = {
     create: (data: NoteInput) => api.post("/notes", data),
     update: (id: string, data: NoteInput) => api.patch(`/notes/${id}`, data),
     remove: (id: string) => api.delete(`/notes/${id}`),
+};
+
+export interface FeedbackInput {
+    message: string;
+    rating?: number;
+    email?: string;
+    source?: "landing" | "settings" | "app";
+}
+
+/** Product feedback. Anonymous from the landing page; attributed to the account
+ *  when a token is present (the axios instance adds it if signed in). */
+export const feedbackService = {
+    submit: (data: FeedbackInput) => api.post("/feedback", data),
+    // Admin-only (ADMIN_EMAILS); non-admins get 403.
+    list: () => api.get("/feedback"),
 };
 
 /** Matches the backend's slugify, so links built here resolve server-side. */

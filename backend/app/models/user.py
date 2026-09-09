@@ -12,6 +12,9 @@ class User(Base):
     target_role = Column(String)
     is_active = Column(Boolean(), default=True)
     is_superuser = Column(Boolean(), default=False)
+    # Whether the account's email has been confirmed via an OTP. Only enforced
+    # when EMAIL_VERIFICATION_ENABLED is on; existing rows are backfilled true.
+    email_verified = Column(Boolean(), default=False, nullable=False, server_default="true")
 
     # Relationships
     resumes = relationship("Resume", back_populates="owner", cascade="all, delete-orphan")
