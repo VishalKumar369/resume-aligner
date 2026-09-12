@@ -20,6 +20,7 @@ secrets/
 *.key
 auth_token*
 
-# Local data
-data/
-db/
+# Local data (top-level only; anchored so nested source packages like
+# backend/app/db/ are not ignored)
+/data/
+/db/
