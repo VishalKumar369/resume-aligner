@@ -108,17 +108,22 @@ class Settings(BaseSettings):
     VECTOR_DIMENSION: int = 1536
     
     # Storage
-    STORAGE_TYPE: str = "local" # local, cloudinary, firebase
+    STORAGE_TYPE: str = "local" # local, cloudinary, firebase, supabase
     UPLOAD_DIR: str = "uploads"
-    
+
     # Cloudinary (Optional)
     CLOUDINARY_CLOUD_NAME: Optional[str] = None
     CLOUDINARY_API_KEY: Optional[str] = None
     CLOUDINARY_API_SECRET: Optional[str] = None
-    
+
     # Firebase (Optional)
     FIREBASE_CREDENTIALS_PATH: Optional[str] = None
     FIREBASE_STORAGE_BUCKET: Optional[str] = None
+
+    # Supabase Storage (Optional)
+    SUPABASE_URL: Optional[str] = None
+    SUPABASE_SERVICE_KEY: Optional[str] = None
+    SUPABASE_BUCKET_NAME: str = "resumes"
 
     # CORS
     BACKEND_CORS_ORIGINS: List[AnyHttpUrl] = []
