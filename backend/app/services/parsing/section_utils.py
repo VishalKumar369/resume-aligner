@@ -44,6 +44,7 @@ class SectionMatcher(Generic[SectionT]):
         aliases: Dict[SectionT, Iterable[str]],
         default_section: SectionT,
         max_header_words: int = 5,
+        lead_in_cues: Optional[Dict[SectionT, Iterable[str]]] = None,
     ):
         # Aliases go through the same normalisation as the lines they are
         # matched against, so "what we're looking for" and "extra-curricular"
@@ -58,6 +59,20 @@ class SectionMatcher(Generic[SectionT]):
         self._sorted_aliases = sorted(self._lookup, key=len, reverse=True)
         self._default = default_section
         self._max_header_words = max_header_words
+        # Colon lead-in cues: a full sentence that introduces a list and ends in
+        # a colon is a header too ("In these roles you will be responsible for
+        # X:"). Only sections given cues opt in, so other parsers are unchanged.
+        # Longest-first again, so a more specific cue wins.
+        self._lead_in_cues: List[Tuple[str, SectionT]] = sorted(
+            (
+                (normalize_label(cue), section)
+                for section, cue_group in (lead_in_cues or {}).items()
+                for cue in cue_group
+                if normalize_label(cue)
+            ),
+            key=lambda pair: len(pair[0]),
+            reverse=True,
+        )
 
     def match(self, line: str) -> Optional[SectionT]:
         """Return the section a line names, or None if it is body content.
@@ -66,7 +81,7 @@ class SectionMatcher(Generic[SectionT]):
         not, because content follows the colon.
         """
         candidate = (line or "").strip()
-        if not candidate or len(candidate.split()) > self._max_header_words:
+        if not candidate:
             return None
 
         if ":" in candidate and candidate.split(":", 1)[1].strip():
@@ -74,6 +89,18 @@ class SectionMatcher(Generic[SectionT]):
 
         normalized = normalize_label(candidate)
         if not normalized:
+            return None
+
+        # A colon lead-in sentence ("In these roles you will be responsible
+        # for X:") introduces the list that follows, so it acts as a header
+        # even though it is longer than a standalone label. Checked before the
+        # word-count gate, which such lines would always fail.
+        if candidate.endswith(":"):
+            for cue, section in self._lead_in_cues:
+                if cue and cue in normalized:
+                    return section
+
+        if len(candidate.split()) > self._max_header_words:
             return None
 
         for alias in self._sorted_aliases:

@@ -55,8 +55,27 @@ _JD_ALIASES: Dict[JDSection, tuple] = {
     ),
 }
 
+# Colon lead-in sentences that introduce a list, e.g. "In these roles you will
+# be responsible for X:" — too long to be a standalone label, but they head the
+# bullets that follow just the same. Matched by substring, so wording around the
+# cue does not matter.
+_JD_LEAD_IN_CUES = {
+    JDSection.RESPONSIBILITIES: (
+        "responsible for", "responsibilities include", "you will be responsible",
+        "in this role you will", "in these roles you will",
+        "what you will be doing", "what you'll be doing",
+    ),
+    JDSection.REQUIREMENTS: (
+        "requirements for this role", "requirements include",
+        "you should have", "you will need", "we are looking for",
+        "what we're looking for", "what we are looking for",
+    ),
+}
+
 # JD headers run longer than resume ones ("What we're looking for").
-_MATCHER: SectionMatcher = SectionMatcher(_JD_ALIASES, JDSection.HEADER, max_header_words=6)
+_MATCHER: SectionMatcher = SectionMatcher(
+    _JD_ALIASES, JDSection.HEADER, max_header_words=6, lead_in_cues=_JD_LEAD_IN_CUES
+)
 
 
 class JDSections(SectionBlocks):

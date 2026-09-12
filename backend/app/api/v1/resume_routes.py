@@ -7,7 +7,7 @@ from io import BytesIO
 from typing import List, Optional
 
 from fastapi import APIRouter, Depends, File, Form, HTTPException, Query, UploadFile
-from fastapi.responses import FileResponse
+from fastapi.responses import Response
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.api.deps import get_current_user_id
@@ -304,14 +304,36 @@ async def download_version(
 
     attribute, media_type = DOWNLOAD_FORMATS[format]
     path = getattr(version, attribute, None)
-    if not path or not os.path.exists(path):
+    if not path:
         raise HTTPException(
             status_code=404,
             detail=f"No {format.upper()} file stored for this version.",
         )
 
+    # Fetch through the storage backend rather than reading the local disk
+    # directly: the stored handle is only a filesystem path for local storage;
+    # for cloud backends (supabase/cloudinary/firebase) it is an opaque object
+    # key that os.path can't resolve.
+    try:
+        content = await get_storage().get_file_content(path)
+    except FileNotFoundError:
+        raise HTTPException(
+            status_code=404,
+            detail=f"No {format.upper()} file stored for this version.",
+        )
+    except Exception:  # noqa: BLE001 - surface a clean error, log the cause
+        logger.warning("Failed to read %s for version %s", format, version_id, exc_info=True)
+        raise HTTPException(
+            status_code=502,
+            detail=f"Could not retrieve the {format.upper()} file from storage.",
+        )
+
     stem = os.path.splitext(version.filename or "resume")[0]
-    return FileResponse(path, media_type=media_type, filename=f"{stem}.{format}")
+    return Response(
+        content=content,
+        media_type=media_type,
+        headers={"Content-Disposition": f'attachment; filename="{stem}.{format}"'},
+    )
 
 
 @router.get("/{resume_id}/versions", response_model=List[ResumeVersionOut])
