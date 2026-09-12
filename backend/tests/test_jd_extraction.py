@@ -63,6 +63,21 @@ class TestJDSections:
     def test_content_line_is_not_a_header(self):
         assert match_jd_section_header("- 5+ years of experience") is None
 
+    def test_colon_lead_in_sentence_heads_the_responsibilities_list(self):
+        # Real postings often introduce the list with a full sentence ending in a
+        # colon, which is longer than a standalone label but heads it just the same.
+        header = "In these roles you will be responsible for Full Stack Developer:"
+        assert match_jd_section_header(header) is JDSection.RESPONSIBILITIES
+
+    def test_colon_lead_in_groups_the_bullets_that_follow(self):
+        jd = (
+            "In these roles you will be responsible for the platform:\n"
+            "Design and build backend services.\n"
+            "Own features from design through deployment.\n"
+        )
+        sections = split_jd_sections(jd)
+        assert len(sections.get(JDSection.RESPONSIBILITIES)) == 2
+
     def test_header_block_holds_the_title_and_company(self):
         sections = split_jd_sections(STRUCTURED_JD)
         assert sections.get(JDSection.HEADER)[0] == "Senior Backend Engineer"

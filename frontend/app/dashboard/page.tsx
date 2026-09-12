@@ -90,10 +90,24 @@ export default function DashboardPage() {
 
     const heatmap = detail ? buildHeatmap(detail) : [];
     const improvements = detail ? buildImprovements(detail) : [];
-    const radarAxes = Object.entries(detail?.breakdown || {}).map(([name, score]: any) => ({
+
+    // One axis per alignment component this run actually scored (skill,
+    // responsibility, project, seniority). A radar needs three axes to be a
+    // shape rather than a sliver, so when a run scored fewer, fall back to the
+    // four headline scores — always present — and the radar still draws.
+    const componentAxes = Object.entries(detail?.breakdown || {}).map(([name, score]: any) => ({
         skill: name.replace(/_match$/, "").replace(/_/g, " ").replace(/\b\w/g, (c: string) => c.toUpperCase()),
         score: Number(score),
     }));
+    const headlineAxes = detail
+        ? [
+              { skill: "Alignment", score: Number(detail.alignment_score ?? 0) },
+              { skill: "ATS", score: Number(detail.ats_score ?? 0) },
+              { skill: "Skill Match", score: Number(detail.skill_match_score ?? 0) },
+              { skill: "Experience", score: Number(detail.experience_match_score ?? 0) },
+          ]
+        : [];
+    const radarAxes = componentAxes.length >= 3 ? componentAxes : headlineAxes;
 
     const resumeUnhealthy = detail?.extraction_health && detail.extraction_health.resume_ok === false;
     const analyzedOn = active?.created_at ? new Date(active.created_at).toLocaleDateString() : null;
@@ -142,7 +156,7 @@ export default function DashboardPage() {
 
             {/* Row 1: ATS breakdown + recommendations (equal height, each scrolls). */}
             <div className="grid lg:grid-cols-2 gap-6">
-                <AtsBreakdownPanel axes={radarAxes} analyses={analyses} className="lg:h-[388px]" />
+                <AtsBreakdownPanel axes={componentAxes} analyses={analyses} className="lg:h-[388px]" />
 
                 <motion.div
                     initial={{ opacity: 0, y: 16 }}
